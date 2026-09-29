@@ -81,8 +81,9 @@ swapped or lost without anyone reconfiguring.
 ([self-host.md](self-host.md): the `finger-host` image, MySQL and Caddy in one
 compose stack). A second host catches up with GASP: it receives unspent outputs
 only (every carrier, but only each identity's current token) and rebuilds each
-chain from them, as it does on restart. It holds none of the funding outputs
-its carriers spent, so it does not see a later kill of them
+chain from them, as it does on restart. Kills reach it too: a sweep's
+tombstone is an unspent topic output, so sync carries the sweep, and the host
+reads the spends from the sweep's own inputs
 ([flows.md 16](flows.md#16-catching-up-from-a-peer)).
 
 **Multicast.** A BSV multicast network delivers BEEF objects to every

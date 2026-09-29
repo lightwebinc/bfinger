@@ -371,8 +371,10 @@ by the carrier. Refusals are counted by `finger_refused_total{reason}`.
   outpoint as BEEF; the record is inside the carrier's BEEF. `context` is not
   needed.
 - **Kill**: the service records the outputs every carrier spends. When any of
-  them is spent by a txid other than that carrier (a spend notification, or a
-  second carrier claiming it), it kills the carrier: every state the carrier is
+  them is spent by a txid other than that carrier (a spend notification, a
+  second carrier claiming it, or the input of any admitted transaction, which
+  the service reads itself so that a host holding a sweep without the outputs
+  it spent still sees the kill, in any arrival order), it kills the carrier: every state the carrier is
   part of, and every carrier of that identity with its tokens, is dropped;
   the identity answers nothing afterwards, pending and carrier questions included;
   and late tokens or carriers of it are refused (`finger_killed_total`). The

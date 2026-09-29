@@ -15,7 +15,7 @@
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { PrivateKey, Transaction } from '@bsv/sdk'
+import { PrivateKey, Transaction, UnlockingScript } from '@bsv/sdk'
 import { commitment, decodeCarrier } from './carrier.js'
 import { CborMap } from '@lightwebinc/bcommon'
 import { FingerLookupService, JoinFailures, KillReasons, reverseHex } from './ls_finger.js'
@@ -227,6 +227,34 @@ test('a rebuild keeps the transition whose token spent the chain, not the lower 
   admit(ls, cB)
   ls.rebuildChains()
   assert.deepEqual(await ask(ls, p.g.identityKeyHex), want)
+})
+
+// A host that caught up from a peer may hold a sweep without the funding
+// outputs it spent, so the engine reports no spend. The kill must come from
+// the sweep's own inputs, in either arrival order.
+test('a sweep kills from its own inputs, whether it arrives before or after the carriers', async () => {
+  const sweepOf = (...carriers: Transaction[]): Transaction => {
+    const tx = new Transaction()
+    for (const c of carriers) {
+      const input = c.inputs[0]!
+      tx.addInput({ sourceTXID: input.sourceTXID!, sourceOutputIndex: input.sourceOutputIndex, sequence: 0xffffffff, unlockingScript: new UnlockingScript([]) })
+    }
+    // The tombstone is funding-shaped, which is what gets it admitted.
+    tx.addOutput({ lockingScript: p0.funding.outputs[0]!.lockingScript, satoshis: 1 })
+    return tx
+  }
+  const p0 = parsed()
+  for (const sweepFirst of [false, true]) {
+    const { ls, p } = fresh()
+    const sweep = sweepOf(p.carrier1, p.carrier2)
+    if (sweepFirst) admit(ls, sweep)
+    createThenUpdate(ls, p)
+    if (!sweepFirst) {
+      assert.equal((await ask(ls, p.g.identityKeyHex)).length, 3)
+      admit(ls, sweep)
+    }
+    assert.deepEqual(await ask(ls, p.g.identityKeyHex), [], sweepFirst ? 'sweep first' : 'sweep last')
+  }
 })
 
 test('a rebuild leaves a live chain as it was', async () => {

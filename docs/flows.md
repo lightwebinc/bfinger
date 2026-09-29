@@ -528,9 +528,10 @@ sequenceDiagram
   Note over N: lookups answer with no restart
 ```
 
-The walk is `restore`'s, run without reading storage. A host filled this way
-holds none of the funding outputs its carriers spent, so it does not see a
-later kill of them.
+The walk is `restore`'s, run without reading storage. Kills arrive the same
+way: a sweep's tombstone is an unspent topic output, so sync carries the
+sweep, and the host reads its spends from the sweep's inputs, whatever order
+the graphs arrive in (and again from the stored BEEF on a restart).
 
 ### 17. The kill, at the host
 

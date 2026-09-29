@@ -196,6 +196,8 @@ export class FingerLookupService implements LookupService {
   private readonly carrierIdentity = new Map<string, string>()
   /** Identities the kill switch retracted. Nothing of theirs is indexed again. */
   private readonly killed = new Set<string>()
+  /** Outpoint -> spenders, for spends heard before the outpoint was known as funding. */
+  private readonly earlySpends = new Map<string, Set<string>>()
   /** Profile locking key hex -> killed identity, so a late token is refused too. */
   private readonly killedProfiles = new Map<string, string>()
   /** A scheduled rebuild of the chains from the index (see rebuildChains). */
@@ -260,6 +262,7 @@ export class FingerLookupService implements LookupService {
     const txid = tx.id('hex')
     const out = tx.outputs[payload.outputIndex]
     if (out === undefined) return
+    this.noteInputs(tx)
     const script = out.lockingScript
     const outpoint = { txid, outputIndex: payload.outputIndex }
 
@@ -298,16 +301,47 @@ export class FingerLookupService implements LookupService {
 
   outputSpent(payload: OutputSpent): void {
     if (payload.mode !== 'txid') return
-    const k = outpointKey({ txid: payload.txid, outputIndex: payload.outputIndex })
-    this.spentBy.set(k, payload.spendingTxid)
+    this.noteSpend(outpointKey({ txid: payload.txid, outputIndex: payload.outputIndex }), payload.spendingTxid)
+  }
+
+  /**
+   * Record that `k` was spent by `spendingTxid`. The carrier's own spend of
+   * its funding output is the one the design expects. Any other txid is a
+   * second spend of the same output: the carrier is now a double spend, and
+   * the record it carried is retracted. Idempotent: a kill drops the funding
+   * entry, so hearing the same spend twice kills once.
+   */
+  private noteSpend(k: string, spendingTxid: string): void {
+    this.spentBy.set(k, spendingTxid)
     const f = this.funding.get(k)
-    if (f === undefined) return
-    f.spenders.add(payload.spendingTxid)
-    // The carrier's own spend is the one the design expects. Any other
-    // txid is a second spend of the same output: the carrier is now a
-    // double spend, and the record it carried is retracted.
-    if (f.carrierTxid !== undefined && f.carrierTxid !== payload.spendingTxid) {
-      this.kill(f.carrierTxid, 'funding-spent', { outpoint: k, spendingTxid: payload.spendingTxid })
+    if (f === undefined) {
+      // A spend of an outpoint not known as funding (yet): kept aside, so a
+      // carrier that arrives later on it is dead on arrival (linkFunding).
+      let early = this.earlySpends.get(k)
+      if (early === undefined) this.earlySpends.set(k, (early = new Set()))
+      early.add(spendingTxid)
+      return
+    }
+    f.spenders.add(spendingTxid)
+    if (f.carrierTxid !== undefined && f.carrierTxid !== spendingTxid) {
+      this.kill(f.carrierTxid, 'funding-spent', { outpoint: k, spendingTxid })
+    }
+  }
+
+  /**
+   * Every input of an admitted transaction is a spend, whether or not this
+   * host holds the output it spends. The engine reports spends only of
+   * outputs in storage, so a host that caught up from a peer (GASP sends
+   * unspent outputs, graphs in no fixed order) could hold a sweep without
+   * the funding outputs it spent and never see the kill. Reading the spends
+   * from the transaction itself makes the kill independent of arrival order.
+   */
+  private noteInputs(tx: Transaction): void {
+    const txid = tx.id('hex')
+    for (const input of tx.inputs) {
+      const src = input.sourceTXID ?? input.sourceTransaction?.id('hex')
+      if (src === undefined) continue
+      this.noteSpend(outpointKey({ txid: src, outputIndex: input.sourceOutputIndex }), txid)
     }
   }
 
@@ -363,9 +397,16 @@ export class FingerLookupService implements LookupService {
     }
   }
 
+  /** The spenders heard for k before it was known as funding, now claimed. */
+  private takeEarly(k: string): Set<string> {
+    const early = this.earlySpends.get(k) ?? new Set<string>()
+    this.earlySpends.delete(k)
+    return early
+  }
+
   private indexFunding(outpoint: Outpoint): void {
     const k = outpointKey(outpoint)
-    if (!this.funding.has(k)) this.funding.set(k, { spenders: new Set() })
+    if (!this.funding.has(k)) this.funding.set(k, { spenders: this.takeEarly(k) })
     this.byOutpoint.set(k, { kind: 'funding', cHex: '' })
   }
 
@@ -446,7 +487,7 @@ export class FingerLookupService implements LookupService {
       const k = outpointKey(f)
       let e = this.funding.get(k)
       if (e === undefined) {
-        e = { spenders: new Set() }
+        e = { spenders: this.takeEarly(k) }
         this.funding.set(k, e)
       }
       if (e.carrierTxid !== undefined && e.carrierTxid !== c.outpoint.txid) {
@@ -698,6 +739,7 @@ export class FingerLookupService implements LookupService {
     this.carrierIdentity.clear()
     this.killed.clear()
     this.killedProfiles.clear()
+    this.earlySpends.clear()
     let fundingRows = 0
     const carrierRows: Array<{ entry: CarrierEntry; topic: string }> = []
     for (const o of outputs) {
@@ -724,6 +766,17 @@ export class FingerLookupService implements LookupService {
       this.indexCarrier(entry)
       this.linkFunding(entry)
       carrierRows.push({ entry, topic: o.topic })
+    }
+    // The spends the stored transactions themselves record, when the host
+    // passes rows with their BEEF: the same order-independent kill as
+    // noteInputs gives live, for a sweep whose spent outputs were never held.
+    for (const o of outputs) {
+      if (o.beef === undefined) continue
+      try {
+        this.noteInputs(Transaction.fromBEEF(o.beef, o.txid))
+      } catch {
+        // A row whose BEEF does not parse still restores from its script.
+      }
     }
     for (const { entry, topic } of carrierRows) {
       // Dropped already by a kill earlier in this pass (same identity).
@@ -785,7 +838,15 @@ export class FingerLookupService implements LookupService {
     // is known to have spent a token (the spend notifications kept live),
     // which is the one the chain actually took, and fall back to commitment
     // order only when neither is known.
-    const spenders = new Set(this.spentBy.values())
+    // A token that spent another token is a transition the chain took; a
+    // spend of anything else (a fee input) says nothing about the chain.
+    const spenders = new Set<string>()
+    for (const list of this.tokens.values()) {
+      for (const t of list) {
+        const by = this.spentBy.get(outpointKey(t.outpoint))
+        if (by !== undefined) spenders.add(by)
+      }
+    }
     const taken = (c: CarrierEntry): number => {
       const t = this.tokenFor(c.cHex, c.identityKeyHex)
       return t !== undefined && spenders.has(t.outpoint.txid) ? 0 : 1

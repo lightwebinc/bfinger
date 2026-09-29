@@ -70,8 +70,11 @@ every carrier (carriers are never spent) but only each identity's current
 token, so live joins refuse the history `no-current`. After a burst of those
 refusals settles, `ls_finger` re-derives every chain the way `restore` does,
 logs `ls_finger rebuilt its chains from the index`, and answers without a
-restart. Such a replica holds none of the funding outputs its carriers spent,
-so it does not see a later kill of them ([flows 16](../docs/flows.md#16-catching-up-from-a-peer)).
+restart. Kills reach such a replica through the sweep, which sync carries
+(its tombstone is a topic output): the service reads the spends from every
+admitted transaction's inputs, and on restore from each row's BEEF, which
+the reference host passes from v0.2.1
+([flows 16](../docs/flows.md#16-catching-up-from-a-peer)).
 
 ## Deploying
 

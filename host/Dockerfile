@@ -10,7 +10,7 @@
 # tag in a FROM line, so the release pins it and a rehearsal can point at a
 # locally built one.
 
-ARG BLUEPRINTS=ghcr.io/lightwebinc/overlay-blueprints:0.2.0
+ARG BLUEPRINTS=ghcr.io/lightwebinc/overlay-blueprints:0.2.1
 
 # The bundle is JavaScript, the same bytes on every platform, so it is built
 # once on the build machine's own platform; the final stage only copies files
