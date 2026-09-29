@@ -27,6 +27,10 @@ services:
       MYSQL_USER: overlay
       MYSQL_PASSWORD: ${DB_PASSWORD:-overlay-internal}
       MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    # Sized for a small host (1 GiB); raise DB_BUFFER_POOL on a bigger one.
+    command:
+      - --innodb-buffer-pool-size=${DB_BUFFER_POOL:-128M}
+      - --performance-schema=OFF
     volumes:
       - db:/var/lib/mysql
     healthcheck:

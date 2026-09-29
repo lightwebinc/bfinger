@@ -58,7 +58,7 @@ The argument in full: [docs/overview.md](docs/overview.md).
 | Container | `docker run --rm -it ghcr.io/lightwebinc/bfinger -header-url woc:main alice@example.com` (linux/amd64, linux/arm64) |
 | Binary | [Releases](https://github.com/lightwebinc/bfinger/releases): static builds for Linux and macOS, amd64 and arm64, with `SHA256SUMS` |
 | Source | `go build ./cmd/bfinger` (Go 1.26.2 or later) |
-| A host of your own | `HOST=finger.example.com docker compose up -d` with the release's `compose.yaml`: see [docs/self-host.md](docs/self-host.md) |
+| A host of your own | `HOST=finger.example.com docker compose up -d` with the release's `compose.yaml` ([docs/self-host.md](docs/self-host.md)), or one CloudFormation stack on AWS ([deploy/aws](deploy/aws/README.md)) |
 
 ## Documentation
 

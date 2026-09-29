@@ -34,7 +34,9 @@ and Linux.
 
 ## 2. Run a host
 
-On a server with Docker, ports 80 and 443 free, and a DNS name pointing at it:
+On AWS, one CloudFormation stack builds the server and starts all of this:
+[deploy/aws](../deploy/aws/README.md). Anywhere else, on a server with
+Docker, ports 80 and 443 free, and a DNS name pointing at it:
 
 ```console
 $ curl -fsSLO https://github.com/lightwebinc/bfinger/releases/latest/download/compose.yaml

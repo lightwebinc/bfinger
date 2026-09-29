@@ -1,0 +1,210 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  One finger host on EC2 (arm64 by default): its own small VPC, an Elastic IP,
+  an optional DNS record, SSH from one address, and Docker with the compose
+  plugin. With ComposeUrl set it also starts the host stack (docs/self-host.md).
+  Delete the stack to remove everything it made.
+
+Parameters:
+  HostName:
+    Type: String
+    Description: The host's DNS name, e.g. finger.example.com. Caddy gets its certificate for this name.
+  HostedZoneId:
+    Type: String
+    Default: ""
+    Description: Route 53 zone to create the A record in. Leave empty to manage DNS yourself.
+  SSHPublicKey:
+    Type: String
+    Default: ""
+    Description: An OpenSSH public key line (ssh-ed25519 ...). Leave empty to use Session Manager only.
+  SSHFrom:
+    Type: String
+    Default: ""
+    Description: CIDR allowed to SSH, e.g. 203.0.113.7/32. Leave empty to open no SSH port.
+  InstanceType:
+    Type: String
+    Default: t4g.micro
+    Description: t4g.micro (1 GiB, with 2 GiB swap) is the smallest that runs the stack comfortably.
+  ImageParameter:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-arm64
+    Description: Amazon Linux 2023 image; use the x86_64 path with an x86 instance type.
+  VolumeSize:
+    Type: Number
+    Default: 16
+    MinValue: 8
+    Description: Root volume in GiB (gp3).
+  Headers:
+    Type: String
+    Default: woc:main
+    Description: The host's header source (woc:main, woc:test, chaintracks:https://.../v2).
+  ComposeUrl:
+    Type: String
+    Default: ""
+    Description: URL of the release's compose.yaml. Empty installs Docker only; copy compose.yaml to /opt/finger yourself.
+  ComposeVersion:
+    Type: String
+    Default: v5.5.1
+    Description: Docker Compose plugin release.
+
+Conditions:
+  HasZone: !Not [!Equals [!Ref HostedZoneId, ""]]
+  HasKey: !Not [!Equals [!Ref SSHPublicKey, ""]]
+  HasSSH: !Not [!Equals [!Ref SSHFrom, ""]]
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.73.0.0/24
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags: [{ Key: Name, Value: !Ref AWS::StackName }]
+  Gateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags: [{ Key: Name, Value: !Ref AWS::StackName }]
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: { VpcId: !Ref Vpc, InternetGatewayId: !Ref Gateway }
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.73.0.0/26
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      Tags: [{ Key: Name, Value: !Ref AWS::StackName }]
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags: [{ Key: Name, Value: !Ref AWS::StackName }]
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties: { RouteTableId: !Ref RouteTable, DestinationCidrBlock: 0.0.0.0/0, GatewayId: !Ref Gateway }
+  SubnetRoutes:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: { SubnetId: !Ref Subnet, RouteTableId: !Ref RouteTable }
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: finger host, HTTP and HTTPS from anywhere, SSH from one address
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - { IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0, Description: ACME and redirect }
+        - { IpProtocol: tcp, FromPort: 443, ToPort: 443, CidrIp: 0.0.0.0/0, Description: lookups and submits }
+        - !If
+          - HasSSH
+          - { IpProtocol: tcp, FromPort: 22, ToPort: 22, CidrIp: !Ref SSHFrom, Description: operator SSH }
+          - !Ref AWS::NoValue
+      Tags: [{ Key: Name, Value: !Ref AWS::StackName }]
+
+  KeyPair:
+    Type: AWS::EC2::KeyPair
+    Condition: HasKey
+    Properties:
+      KeyName: !Sub "${AWS::StackName}-operator"
+      PublicKeyMaterial: !Ref SSHPublicKey
+
+  # Session Manager as well as (or instead of) SSH: no port, audited in AWS.
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - { Effect: Allow, Principal: { Service: ec2.amazonaws.com }, Action: sts:AssumeRole }
+      ManagedPolicyArns: [arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore]
+  Profile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: { Roles: [!Ref Role] }
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        MetadataOptions: { HttpTokens: required, HttpEndpoint: enabled, HttpPutResponseHopLimit: 1 }
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs: { VolumeSize: !Ref VolumeSize, VolumeType: gp3, Encrypted: true, DeleteOnTermination: true }
+
+  Instance:
+    Type: AWS::EC2::Instance
+    DependsOn: DefaultRoute
+    Properties:
+      ImageId: !Ref ImageParameter
+      InstanceType: !Ref InstanceType
+      KeyName: !If [HasKey, !Ref KeyPair, !Ref AWS::NoValue]
+      IamInstanceProfile: !Ref Profile
+      LaunchTemplate: { LaunchTemplateId: !Ref LaunchTemplate, Version: !GetAtt LaunchTemplate.LatestVersionNumber }
+      NetworkInterfaces:
+        - { DeviceIndex: "0", SubnetId: !Ref Subnet, GroupSet: [!Ref SecurityGroup], AssociatePublicIpAddress: false }
+      Tags: [{ Key: Name, Value: !Ref AWS::StackName }]
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          # Swap, so a 1 GiB instance runs MySQL, the host and Caddy.
+          if [ ! -f /swapfile ]; then
+            fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+            echo '/swapfile none swap sw 0 0' >> /etc/fstab
+          fi
+          dnf -y install docker
+          systemctl enable --now docker
+          usermod -aG docker ec2-user
+          arch=$(uname -m)
+          plugin=/usr/local/lib/docker/cli-plugins/docker-compose
+          mkdir -p "$(dirname "$plugin")"
+          base=https://github.com/docker/compose/releases/download/${ComposeVersion}/docker-compose-linux-$arch
+          curl -fsSL -o "$plugin" "$base"
+          want=$(curl -fsSL "$base.sha256" | cut -d' ' -f1)
+          echo "$want  $plugin" | sha256sum -c -
+          chmod 0755 "$plugin"
+          mkdir -p /opt/finger/site
+          if [ ! -f /opt/finger/.env ]; then
+            umask 077
+            cat > /opt/finger/.env <<EOF
+          HOST=${HostName}
+          HEADERS=${Headers}
+          ADMIN_TOKEN=$(openssl rand -hex 32)
+          DB_PASSWORD=$(openssl rand -hex 16)
+          EOF
+          fi
+          chown -R ec2-user:ec2-user /opt/finger
+          if [ -n "${ComposeUrl}" ]; then
+            curl -fsSL -o /opt/finger/compose.yaml "${ComposeUrl}"
+            cd /opt/finger && docker compose up -d
+          fi
+
+  Address:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttachment
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref Instance
+      Tags: [{ Key: Name, Value: !Ref AWS::StackName }]
+
+  Record:
+    Type: AWS::Route53::RecordSet
+    Condition: HasZone
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref HostName
+      Type: A
+      TTL: "300"
+      ResourceRecords: [!Ref Address]
+
+Outputs:
+  PublicIp:
+    Value: !Ref Address
+  InstanceId:
+    Value: !Ref Instance
+  HostName:
+    Value: !Ref HostName
+  SSH:
+    Condition: HasKey
+    Value: !Sub "ssh ec2-user@${Address}"
+  SessionManager:
+    Value: !Sub "aws ssm start-session --target ${Instance} --region ${AWS::Region}"
