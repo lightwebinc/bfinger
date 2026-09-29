@@ -62,10 +62,19 @@ function spend(ls: FingerLookupService, spent: Transaction, by: Transaction, out
  */
 const fundingAt = (n: number): { txid: string; vout: number } => ({ txid: 'f'.repeat(62) + n.toString(16).padStart(2, '0'), vout: 0 })
 
-/** Report the outpoint a minted carrier spends as spent by `by`. */
-function spendInput(ls: FingerLookupService, carrier: Transaction, by: Transaction): void {
+/**
+ * Sweep the outpoint a minted carrier spends: admit a final transaction that
+ * spends it, with a funding-shaped (tombstone) output, as a kill arrives.
+ * `by` lends its tombstone script. A spend notification alone is not a kill.
+ */
+function spendInput(ls: FingerLookupService, carrier: Transaction, by: Transaction): Transaction {
   const input = carrier.inputs[0]!
-  ls.outputSpent({ mode: 'txid', txid: input.sourceTXID!, outputIndex: input.sourceOutputIndex, topic: 'tm_finger', spendingTxid: by.id('hex') })
+  const sweep = new Transaction()
+  sweep.addInput({ sourceTXID: input.sourceTXID!, sourceOutputIndex: input.sourceOutputIndex, sequence: 0xffffffff, unlockingScript: new UnlockingScript([]) })
+  sweep.addOutput({ lockingScript: by.outputs[0]!.lockingScript, satoshis: 1 })
+  ls.outputSpent({ mode: 'txid', txid: input.sourceTXID!, outputIndex: input.sourceOutputIndex, topic: 'tm_finger', spendingTxid: sweep.id('hex') })
+  admit(ls, sweep)
+  return sweep
 }
 
 async function ask(ls: FingerLookupService, identityKey: string, pending = false): Promise<string[]> {
@@ -498,8 +507,12 @@ test('the sweep kills the identity; the carrier\'s own spend does not; a late pa
   assert.equal(host.count('finger_killed_total', { reason: 'funding-spent' }), 0)
 
   // The sweep: the engine reports each funding output spent by the sweep
-  // txid, then admits the sweep's funding-shaped output.
+  // txid, then admits the sweep's funding-shaped output. The report alone is
+  // not a kill (a refused submission is reported too); the admitted, final
+  // sweep is.
   spend(ls, p.funding, p.sweep, 0)
+  assert.equal(host.count('finger_killed_total', { reason: 'funding-spent' }), 0)
+  admit(ls, p.sweep)
   assert.equal(host.count('finger_killed_total', { reason: 'funding-spent' }), 1)
   assert.deepEqual(await ask(ls, p.g.identityKeyHex), [])
   assert.deepEqual(await ask(ls, p.g.identityKeyHex, true), [], 'nothing pending for a killed identity either')
@@ -534,6 +547,7 @@ test('a sweep after the update kills every state in the chain, counted once', as
   // carrier2's funding output first: the current state is dropped and with
   // it every carrier of the identity, so carrier1's spend finds nothing.
   spend(ls, p.funding, p.sweep, 1)
+  admit(ls, p.sweep)
   assert.deepEqual(await ask(ls, p.g.identityKeyHex), [])
   spend(ls, p.funding, p.sweep, 0)
   spend(ls, p.funding, p.sweep, 3)
@@ -562,16 +576,37 @@ test('a carrier whose funding output was already spent by something else is dead
   assert.deepEqual(await ask(ls, p.g.identityKeyHex, true), [])
 })
 
-test('a second carrier on a claimed funding output kills the first, as the notification would', async () => {
-  // The funding tree is NOT admitted here, so no spend is reported and the
-  // service learns of the second spend from the carrier itself. (Only the
-  // record key can spend a funding output and the engine's SPV step checks
-  // that signature, so this is the owner's doing, not an attacker's.)
+// The reported attack: anyone who sees a carrier can re-encode its unlocking
+// script (a high-S signature, an extra push) into a twin with a new txid
+// that spends the same funding output with the same record. The twin must
+// neither retract the record nor take its place.
+test('a malleated twin of a carrier kills nothing and replaces nothing', async () => {
   const { host, ls, p } = fresh()
-  const m = minter(p.g.privateKeyHex)
+  fundedCreateThenUpdate(ls, p)
+  const want = await ask(ls, p.g.identityKeyHex)
+  const twin = Transaction.fromHex(p.carrier2.toHex())
+  const unlock = twin.inputs[0]!.unlockingScript!
+  twin.inputs[0]!.unlockingScript = new UnlockingScript([...unlock.chunks, { op: 0 }])
+  assert.notEqual(twin.id('hex'), p.carrier2.id('hex'))
+  ls.outputSpent({ mode: 'txid', txid: p.funding.id('hex'), outputIndex: 1, topic: 'tm_finger', spendingTxid: twin.id('hex') })
+  admit(ls, twin)
+  assert.equal(host.count('finger_killed_total', { reason: 'funding-spent' }), 0)
+  assert.deepEqual(await ask(ls, p.g.identityKeyHex), want)
+  ls.rebuildChains()
+  assert.deepEqual(await ask(ls, p.g.identityKeyHex), want, 'and a rebuild keeps the real carrier')
+})
+
+test('a second carrier on a claimed funding output is dropped, and the first stands', async () => {
+  // A malleated twin of a carrier (same record, re-encoded signature, new
+  // txid) spends the same funding output. Neither carrier can mine, so the
+  // second proves nothing: killing the first would let anyone who saw a
+  // carrier retract it. Here the rival is minted by another key, which the
+  // funding lock would refuse on chain; the service must not care who.
+  const { host, ls, p } = fresh()
   admit(ls, p.token1)
   admit(ls, p.carrier1)
-  assert.deepEqual(await ask(ls, p.g.identityKeyHex), [key(p.token1), key(p.carrier1)])
+  const want = [key(p.token1), key(p.carrier1)]
+  assert.deepEqual(await ask(ls, p.g.identityKeyHex), want)
   const other = minter(PrivateKey.fromHex('22'.repeat(32)).toHex())
   const rival = await mintCarrier(other, record({ identityKey: fromHex(other.identityKeyHex), seq: 1n, kind: 1, wc: sha256(fill(0x02)) }), {
     txid: p.funding.id('hex'),
@@ -579,15 +614,16 @@ test('a second carrier on a claimed funding output kills the first, as the notif
   })
   const rivalToken = await mintToken(other, commitment(rival), [{ txid: p.funding.id('hex'), vout: 3 }])
   admit(ls, rival)
-  assert.equal(host.count('finger_killed_total', { reason: 'funding-spent' }), 1)
-  assert.deepEqual(await ask(ls, p.g.identityKeyHex), [])
   admit(ls, rivalToken)
-  assert.deepEqual(await ask(ls, other.identityKeyHex), [key(rivalToken), key(rival)], 'the latest claim lives')
-  assert.equal(host.count('finger_killed_total', { reason: 'funding-spent' }), 1)
-  // Its own spend reported afterwards is not a kill either.
+  assert.equal(host.count('finger_killed_total', { reason: 'funding-spent' }), 0)
+  assert.deepEqual(await ask(ls, p.g.identityKeyHex), want, 'the first carrier stands')
+  assert.deepEqual(await ask(ls, other.identityKeyHex), [], 'the second never joins')
+  assert.ok(host.logged.some((l) => l.msg === 'ls_finger dropped a second carrier on a claimed funding output'))
+  // A non-final spend of the funding output (any re-encoded carrier) is not
+  // a kill either, whether reported or admitted.
   spend(ls, p.funding, rival, 0)
-  assert.equal(host.count('finger_killed_total', { reason: 'funding-spent' }), 1)
-  assert.equal(m.identityKeyHex, p.g.identityKeyHex)
+  assert.equal(host.count('finger_killed_total', { reason: 'funding-spent' }), 0)
+  assert.deepEqual(await ask(ls, p.g.identityKeyHex), want)
 })
 
 test('restore rebuilds the same answer from unspent outputs, in any row order', async () => {
@@ -671,9 +707,25 @@ test('restore re-reads each carrier\'s funding outpoint: spent by its carrier is
       ],
     }),
   ])
+  // Storage also records spends by submissions the topic refused (a
+  // malleated carrier, say); with no admitted row of its own, such a
+  // spender is not a kill.
+  const refused = fakeStorage([
+    row(p.funding, 0, true, {
+      consumedBy: [
+        { txid: p.carrier1.id('hex'), outputIndex: 0 },
+        { txid: '33'.repeat(32), outputIndex: 0 },
+      ],
+    }),
+  ])
+  const lsR = new FingerLookupService(countingHost())
+  await lsR.restore(rows, refused)
+  assert.deepEqual(await ask(lsR, p.g.identityKeyHex), [key(p.token1), key(p.carrier1)], 'a refused spender kills nothing')
+
+  // The sweep's tombstone is an unspent topic output, so its row is there.
   const host2 = countingHost()
   const ls2 = new FingerLookupService(host2)
-  await ls2.restore(rows, swept)
+  await ls2.restore([...rows, row(p.sweep, 0)], swept)
   assert.deepEqual(await ask(ls2, p.g.identityKeyHex), [])
   assert.equal(host2.count('finger_killed_total', { reason: 'funding-spent' }), 1)
   assert.equal(ls2.killedCount, 1)
@@ -856,6 +908,7 @@ test('a killed identity answers nothing on the carrier class', async () => {
   assert.equal(before.length, 1, 'held before the sweep')
 
   spend(ls, p.funding, p.sweep, 0)
+  admit(ls, p.sweep)
 
   const after = await ls.lookup({
     service: 'ls_finger',

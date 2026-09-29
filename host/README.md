@@ -48,12 +48,18 @@ Nothing in these modules meters or prices a query.
 
 A carrier spends a funding output. A mined transaction that spends the same
 output (the sweep) makes the carrier a double spend and retracts the record.
-`ls_finger` keeps `funding[outpoint] -> carrier` and, on a spend by any txid
-other than the carrier's, drops every state that carrier is part of, drops the
+`ls_finger` keeps `funding[outpoint] -> carrier` and, when a **final**
+transaction the topic admitted spends one of those outputs (the sweep, whose
+tombstone is admitted), drops every state that carrier is part of, drops the
 identity's carriers and tokens, and refuses anything of that identity
-delivered later (join refusal `killed`). The carrier's own spend is reported
-before the carrier is admitted and is never a kill. Only a host that admitted
-the funding tree sees the sweep.
+delivered later (join refusal `killed`). The spends are read from the
+admitted transaction's own inputs, so the host need not hold the funding
+tree. Nothing else kills: not the engine's spend notifications (it reports
+spends by refused submissions too), not a non-final spend, and not a second
+carrier on a claimed funding output, which is dropped while the first stands.
+A carrier can never mine and neither can a re-encoding of its signature, so
+these rules are what stop a third party from retracting a record by
+malleating its carrier.
 
 ## Restore and catch-up
 

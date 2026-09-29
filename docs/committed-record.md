@@ -134,8 +134,9 @@ them is what makes the kill switch visible.
 makes that carrier a double spend; once it is mined, every copy of the carrier
 is permanently invalid. The owner's kill is one sweep per funding tree,
 spending every output, used and unused, published to the topic like any object.
-A host that admitted the tree sees the second spend and retracts the identity
-(§7). The sweep's output 0 is a **tombstone**, a funding-shaped output carrying
+A host that admits the sweep reads the spends from its inputs and retracts
+the identity (§7); only a final transaction counts, so a malleated copy of a
+carrier cannot. The sweep's output 0 is a **tombstone**, a funding-shaped output carrying
 the swept value (less the fee when no separate fee input pays it). It is there
 because a host records a spend of an admitted output by the spender's admitted
 outputs: a sweep that admits nothing is seen while the host runs but not after
@@ -371,11 +372,16 @@ by the carrier. Refusals are counted by `finger_refused_total{reason}`.
   outpoint as BEEF; the record is inside the carrier's BEEF. `context` is not
   needed.
 - **Kill**: the service records the outputs every carrier spends. When any of
-  them is spent by a txid other than that carrier (a spend notification, a
-  second carrier claiming it, or the input of any admitted transaction, which
-  the service reads itself so that a host holding a sweep without the outputs
-  it spent still sees the kill, in any arrival order), it kills the carrier: every state the carrier is
-  part of, and every carrier of that identity with its tokens, is dropped;
+  them is spent by a **final** transaction the topic admitted (lock time zero
+  or every input final: a sweep), it kills the carrier. The service reads the
+  spends from the admitted transaction's own inputs, so a host that holds a
+  sweep without the outputs it spent still sees the kill, in any arrival
+  order. A spend notification alone never kills (the engine also reports
+  spends by submissions the topic refused), and a second carrier on a funding
+  output another carrier already claims is dropped and the first stands: a
+  carrier can never mine, and neither can a re-encoding of one, so otherwise
+  anyone who saw a carrier could retract it by malleating its signature. A
+  kill drops every state the carrier is part of, and every carrier of that identity with its tokens, is dropped;
   the identity answers nothing afterwards, pending and carrier questions included;
   and late tokens or carriers of it are refused (`finger_killed_total`). The
   chain keeps the hashes; the host keeps nothing it would have to serve.

@@ -301,7 +301,10 @@ export class FingerLookupService implements LookupService {
 
   outputSpent(payload: OutputSpent): void {
     if (payload.mode !== 'txid') return
-    this.noteSpend(outpointKey({ txid: payload.txid, outputIndex: payload.outputIndex }), payload.spendingTxid)
+    // The engine reports every spend of a held output, including by a
+    // submission the topic manager refused, and names only its txid: enough
+    // for the spend link, never enough to kill (see noteInputs).
+    this.noteSpend(outpointKey({ txid: payload.txid, outputIndex: payload.outputIndex }), payload.spendingTxid, false)
   }
 
   /**
@@ -311,8 +314,9 @@ export class FingerLookupService implements LookupService {
    * the record it carried is retracted. Idempotent: a kill drops the funding
    * entry, so hearing the same spend twice kills once.
    */
-  private noteSpend(k: string, spendingTxid: string): void {
+  private noteSpend(k: string, spendingTxid: string, killing: boolean): void {
     this.spentBy.set(k, spendingTxid)
+    if (!killing) return
     const f = this.funding.get(k)
     if (f === undefined) {
       // A spend of an outpoint not known as funding (yet): kept aside, so a
@@ -338,10 +342,16 @@ export class FingerLookupService implements LookupService {
    */
   private noteInputs(tx: Transaction): void {
     const txid = tx.id('hex')
+    // Only a transaction that can mine is a kill. A carrier never can (its
+    // lock time is 2100 and its input non-final), and neither can any
+    // re-encoding of one: a third party who malleates a carrier's signature
+    // gets a different txid spending the same funding output, and would
+    // otherwise retract the record without the owner's key.
+    const killing = isFinal(tx)
     for (const input of tx.inputs) {
       const src = input.sourceTXID ?? input.sourceTransaction?.id('hex')
       if (src === undefined) continue
-      this.noteSpend(outpointKey({ txid: src, outputIndex: input.sourceOutputIndex }), txid)
+      this.noteSpend(outpointKey({ txid: src, outputIndex: input.sourceOutputIndex }), txid, killing)
     }
   }
 
@@ -482,18 +492,27 @@ export class FingerLookupService implements LookupService {
    * topic manager sees the carrier, so this is the owner's doing.
    */
   private linkFunding(c: CarrierEntry): boolean {
+    // A second carrier on a funding output another carrier already spends is
+    // a re-encoding of that carrier (a malleated signature: same record,
+    // new txid) or the owner re-using an output. Neither can mine, so it
+    // proves nothing: it is dropped and the first carrier stands. Killing the
+    // first here would let anyone who saw a carrier retract it.
+    for (const f of c.funding) {
+      const held = this.funding.get(outpointKey(f))?.carrierTxid
+      if (held !== undefined && held !== c.outpoint.txid) {
+        this.dropCarrier(c)
+        this.host.log('ls_finger dropped a second carrier on a claimed funding output', {
+          c: c.cHex, funding: outpointKey(f), held,
+        })
+        return false
+      }
+    }
     let foreign: { outpoint: string; spendingTxid: string } | undefined
     for (const f of c.funding) {
       const k = outpointKey(f)
       let e = this.funding.get(k)
       if (e === undefined) {
         e = { spenders: this.takeEarly(k) }
-        this.funding.set(k, e)
-      }
-      if (e.carrierTxid !== undefined && e.carrierTxid !== c.outpoint.txid) {
-        this.kill(e.carrierTxid, 'funding-spent', { outpoint: k, spendingTxid: c.outpoint.txid })
-        // The kill dropped the entry with the carrier it belonged to.
-        e = { spenders: new Set() }
         this.funding.set(k, e)
       }
       e.carrierTxid = c.outpoint.txid
@@ -778,13 +797,17 @@ export class FingerLookupService implements LookupService {
         // A row whose BEEF does not parse still restores from its script.
       }
     }
+    const carrierTxids = new Set(carrierRows.map((r) => r.entry.outpoint.txid))
+    const killers = new Set(outputs.filter((o) => !carrierTxids.has(o.txid)).map((o) => o.txid))
     for (const { entry, topic } of carrierRows) {
       // Dropped already by a kill earlier in this pass (same identity).
       if (!this.carriers.has(entry.cHex)) continue
       for (const f of entry.funding) {
         const stored = await storage.findOutput(f.txid, f.outputIndex, topic)
         if (stored === null || !stored.spent) continue
-        const foreign = stored.consumedBy.find((c) => c.txid !== entry.outpoint.txid)
+        // Only a consumer the topic admitted outputs of, and not a carrier:
+        // storage also records spends by submissions the topic refused.
+        const foreign = stored.consumedBy.find((c) => c.txid !== entry.outpoint.txid && killers.has(c.txid))
         if (foreign === undefined) continue
         this.kill(entry.outpoint.txid, 'funding-spent', { outpoint: outpointKey(f), spendingTxid: foreign.txid, restoring: true })
         break
@@ -962,4 +985,13 @@ export class FingerLookupService implements LookupService {
   async getMetaData(): Promise<LookupServiceMetaData> {
     return { name: 'ls_finger', shortDescription: 'Joins committed-record tokens and carriers; answers by identity key.' }
   }
+}
+
+/**
+ * Whether a transaction can be mined as it stands: lock time zero, or every
+ * input final. A carrier is built never to be (lock time 2100, a non-final
+ * input), and so is every re-encoding of one.
+ */
+function isFinal(tx: Transaction): boolean {
+  return tx.lockTime === 0 || tx.inputs.every((i) => (i.sequence ?? 0xffffffff) === 0xffffffff)
 }
