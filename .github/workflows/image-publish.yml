@@ -63,4 +63,4 @@ jobs:
             ghcr.io/lightwebinc/finger-host:${{ github.event.inputs.tag }}
             ghcr.io/lightwebinc/finger-host:latest
           build-args: |
-            BLUEPRINTS=ghcr.io/lightwebinc/overlay-blueprints:0.2.1
+            BLUEPRINTS=ghcr.io/lightwebinc/overlay-blueprints:0.2.2
