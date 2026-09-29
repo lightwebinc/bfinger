@@ -54,12 +54,6 @@ func cmdPublish(ctx context.Context, g *global, args []string, stdout, stderr *o
 	if err != nil {
 		return err
 	}
-	if st == nil {
-		return &exitError{1, "nothing published yet"}
-	}
-	if st.Funding == nil {
-		return &exitError{1, "state has no funding tree; the carrier's parent cannot be rebuilt"}
-	}
 	// Collect any proofs that have arrived first, so what is re-sent below is
 	// the proven form wherever there is one. Collection re-publishes each
 	// proof it finds, which is also what upgrades the hosts.
@@ -77,6 +71,12 @@ func cmdPublish(ctx context.Context, g *global, args []string, stdout, stderr *o
 		s.catchUpProofs(ctx)
 	} else {
 		fmt.Fprintf(stderr, "note: not collecting proofs (%v)\n", err)
+	}
+	if st == nil {
+		return &exitError{1, "nothing published yet"}
+	}
+	if st.Funding == nil {
+		return &exitError{1, "state has no funding tree; the carrier's parent cannot be rebuilt"}
 	}
 	tree, err := funding.Rebuild(st.Funding.RawHex, st.Funding.BumpHex, st.Funding.BeefHex)
 	if err != nil {

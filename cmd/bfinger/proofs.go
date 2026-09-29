@@ -37,7 +37,7 @@ func (s *session) proofOf(ctx context.Context, txid string) (*transaction.Merkle
 // loud outcome is a refusal, which means hosts are holding a state the
 // network will never mine.
 func (s *session) catchUpProofs(ctx context.Context) {
-	if s.st == nil || s.l == nil {
+	if s.l == nil {
 		return
 	}
 	c := &producer.Collector{
@@ -47,6 +47,14 @@ func (s *session) catchUpProofs(ctx context.Context) {
 		Retry: "`bfinger publish -resume` sends it again",
 		Save:  func() error { return owner.Save(s.g.cfg.Home, s.st) },
 		Note:  s.say,
+	}
+	// A home that never published has no state, but can still hold change
+	// from a payment or a sweep waiting on its parent's proof: the pool, not
+	// the state, owns that, so it is collected all the same.
+	if s.st == nil {
+		c.Save = func() error { return nil }
+		c.Collect(ctx, nil, "")
+		return
 	}
 	var items []producer.Pending
 	if s.st.TokenTxid != "" && s.st.TokenBumpHex == "" {

@@ -13,6 +13,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/lightwebinc/bcommon/publish"
 	"github.com/lightwebinc/bfinger/internal/config"
+	"github.com/lightwebinc/bfinger/internal/publisher/bwallet"
 )
 
 // arcadeMock takes every transaction and reports it mined (with a proof)
@@ -85,4 +86,26 @@ func fundScriptForTest(t *testing.T) *script.Script {
 		t.Fatal(err)
 	}
 	return s
+}
+
+// A home that never published still collects the proof of change it holds
+// (from a payment or a sweep), because the pool owns it, not the state.
+func TestHeldChangeIsCollectedWithNoState(t *testing.T) {
+	tx := transaction.NewTransaction()
+	tx.AddOutput(&transaction.TransactionOutput{Satoshis: 900, LockingScript: fundScriptForTest(t)})
+	pool, err := bwallet.OpenPool(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Add(bwallet.Output{TxID: tx.TxID().String(), Vout: 0, Satoshis: 900,
+		LockingScript: tx.Outputs[0].LockingScript.String(), Raw: tx.Hex(), Unproven: true}); err != nil {
+		t.Fatal(err)
+	}
+	s := arcadeSession(t, arcadeMock(t, tx, true, false))
+	s.pool = pool
+	s.l.facade = &publish.Facade{Base: "http://127.0.0.1:1"}
+	s.catchUpProofs(context.Background())
+	if n := len(pool.UnprovenTxids()); n != 0 {
+		t.Fatalf("change still held: %d unproven parent(s)", n)
+	}
 }
