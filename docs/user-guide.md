@@ -632,11 +632,17 @@ the BEEF with its proof. It resolves the recipient before reading your node
 settings, so a bad address fails as a resolution error. Deliver the notice by
 any means.
 
-The wait for a payment, or a `kill` sweep, is bounded (ten minutes from a
-node, an hour from an ARC service, since public blocks can be slow). If it
-runs out after sending, the command fails (exit 2) with the transaction sent:
-the coin stays spent, and its change is held until a later transition or
-`publish -resume` collects the proof. A payment's notice is then not written.
+The notice is written as soon as the payment is sent, and rewritten with the
+proof once it mines. The wait is bounded (ten minutes from a node, an hour
+from an ARC service, since public blocks can be slow); if it runs out, `pay`
+still succeeds and reports `sent, proof pending`, the notice stays valid
+(`receive` fetches the proof by txid once the payment has a block), and the
+change is held until a later command collects its proof.
+
+`kill` records each sweep in the state as soon as it is sent and posts it to
+the hosts before waiting for its block, so a slow block never leaves records
+standing. If posting fails, run `kill` again: it re-posts the recorded sweep
+rather than building a second one.
 
 `bfinger receive notice.json` adds it to the recipient's coin, and refuses
 unless the notice is addressed to this identity, its BEEF matches its txid and

@@ -405,10 +405,12 @@ Any ARC service works. Without a node, `proofs = async` and `header_url` are
 required (usage error otherwise). Arcade's proof is held to a node's checks: it
 parses through the BUMP guard, names the transaction asked about, and agrees
 with the reported height. Change from an unproven parent is held until the
-parent proves. `kill` and `pay` always wait for a mined proof; with no node
-they poll the ARC service for it. A wait that runs out after the transaction
-was sent keeps the coin spent and holds the change until a later command
-collects the proof. `funding = wallet` still needs a node, because the wallet
+parent proves. `pay` and `kill` wait for a block (polling the ARC service when
+there is no node), but only after the payment's notice is written or the
+sweep is recorded and posted; a wait that runs out keeps the coin spent and
+holds the change until a later command collects the proof. Under
+`proofs = wait`, a token whose wait runs out after it was sent continues as
+`async` would: saved and published unmined. `funding = wallet` still needs a node, because the wallet
 broadcasts through its own service.
 
 ## At the host

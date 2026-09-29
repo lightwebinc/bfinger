@@ -772,9 +772,9 @@ change from 1111111111111111111111111111111111111111111111111111111111111111: mi
 Not yet mined notes `accepted, proof pending`. A transaction the service
 refused prints a `WARNING:` naming what hosts hold that will never mine;
 publish a new transition to supersede it. `pay` and `kill` still wait for
-their block, polling the ARC service for the proof; a wait that runs out after
-sending leaves the coin spent and holds the change until a later command
-collects its proof. Configuration refusals, exit `2`:
+their block, polling the ARC service, after the notice is written or the
+sweep posted; a wait that runs out reports the proof as pending and holds the
+change until a later command collects its proof. Configuration refusals, exit `2`:
 
 ```
 bfinger: settle = arcade: with no node (rpc, asset) needs proofs = async: the proof is collected from the arcade installation by a later command

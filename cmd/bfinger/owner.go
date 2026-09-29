@@ -516,30 +516,150 @@ func (s *session) say(format string, a ...any) { fmt.Fprintf(s.stderr, format+"\
 // signed by whichever key here the coin is locked to, change back into the
 // pool, and settlement on the configured leg. It is made on first use, which
 // is after newSession has settled the pool, the tip and the keys.
-// settleMined sends tx and waits for its block, for a transaction that must
-// be mined before anything else happens (a payment, a kill's sweep). With no
-// node, the proof comes from the arcade installation that took tx. Once tx
-// is sent its inputs are spent whatever happens next, so a wait that fails
-// holds its change as unproven for a later command to prove, and reports
-// sent = true: the caller must not give its coin back.
-func (s *session) settleMined(ctx context.Context, what string, tx *transaction.Transaction) (mp *transaction.MerklePath, height uint32, sent bool, err error) {
+// sweepFor returns the kill sweep of one funding tree: the one an earlier
+// run sent (fresh = false), or a new one, built, sent and recorded in the
+// state before it returns, with its change held unproven. A dry run prints
+// the sweep and returns nil.
+func (s *session) sweepFor(ctx context.Context, tr owner.Funding, tf *transitionFlags, stdout *os.File) (*transaction.Transaction, bool, error) {
+	if bh := s.st.Sweeps[tr.Txid]; bh != "" {
+		sweep, err := transaction.NewTransactionFromBEEFHex(bh)
+		if err != nil {
+			return nil, false, fmt.Errorf("recorded sweep of %s: %w", tr.Txid, err)
+		}
+		s.say("sweep %s of tree %s: sent by an earlier run, re-posting it", sweep.TxID(), tr.Txid)
+		return sweep, false, nil
+	}
+	// A tree published before it mined is kept as its BEEF; a sweep of it
+	// carries that ancestry like any other spender would.
+	tree, err := funding.Rebuild(tr.RawHex, tr.BumpHex, tr.BeefHex)
+	if err != nil {
+		return nil, false, fmt.Errorf("tree %s: %w", tr.Txid, err)
+	}
+	signer, err := s.walletFor(tr.IdentityKeyHex)
+	if err != nil {
+		return nil, false, err
+	}
+	vouts := make([]uint32, 0, tr.Count)
+	for i := uint32(0); i < tr.Count; i++ {
+		vouts = append(vouts, i)
+	}
+	var sweep *transaction.Transaction
+	if s.walletFunds() {
+		if sweep, err = s.sweepViaWallet(ctx, signer, tree, vouts); err != nil {
+			return nil, false, fmt.Errorf("sweep of %s: %w", tr.Txid, err)
+		}
+		s.say("sweep %s: %d funding output(s) of tree %s, funded by the wallet", sweep.TxID(), len(vouts), tr.Txid)
+	} else {
+		fee, err := s.take(ctx)
+		if err != nil {
+			return nil, false, err
+		}
+		changeTo, err := s.signer.FundScript()
+		if err != nil {
+			return nil, false, err
+		}
+		if sweep, err = carrier.Sweep(ctx, signer, s.g.cfg.Originator, tree, vouts, fee.Tx, fee.Vout, fee.Unlocker, changeTo, s.fees.SatPerByte, s.fees.Floor); err != nil {
+			s.giveBack()
+			return nil, false, fmt.Errorf("sweep of %s: %w", tr.Txid, err)
+		}
+		s.say("sweep %s: %d funding output(s) of tree %s (%d bytes)", sweep.TxID(), len(vouts), tr.Txid, sweep.Size())
+		if tf.dryRun {
+			fmt.Fprintln(stdout, sweep.Hex())
+			s.giveBack()
+			return nil, false, nil
+		}
+		if err := s.submitTx(ctx, "sweep", sweep); err != nil {
+			s.giveBack()
+			return nil, false, err
+		}
+		s.payer().Change(sweep, 0, nil)
+	}
+	beef, err := sweep.AtomicBEEF(false)
+	if err != nil {
+		return nil, false, err
+	}
+	if s.st.Sweeps == nil {
+		s.st.Sweeps = map[string]string{}
+	}
+	s.st.Sweeps[tr.Txid] = hex.EncodeToString(beef)
+	if err := owner.Save(s.g.cfg.Home, s.st); err != nil {
+		return nil, false, fmt.Errorf("sweep %s was sent, but recording it failed: %w", sweep.TxID(), err)
+	}
+	return sweep, true, nil
+}
+
+// postTree posts a recorded funding tree to the facade.
+func (s *session) postTree(ctx context.Context, tr owner.Funding) error {
+	tree, err := funding.Rebuild(tr.RawHex, tr.BumpHex, tr.BeefHex)
+	if err != nil {
+		return fmt.Errorf("tree %s: %w", tr.Txid, err)
+	}
+	beef, err := tree.AtomicBEEF(false)
+	if err != nil {
+		return err
+	}
+	res, err := s.l.facade.Submit(ctx, s.g.cfg.Topic, beef)
+	if err != nil {
+		return fmt.Errorf("publish funding tree %s: %w", tr.Txid, err)
+	}
+	s.say("funding tree %s: posted again (admitted %v, duplicate %v)", tr.Txid, res.Admitted, res.Duplicate)
+	return nil
+}
+
+// submitTx sends tx through the settlement leg. Once it returns nil, tx's
+// inputs are spent whatever happens next: a caller must never give its coin
+// back after it.
+func (s *session) submitTx(ctx context.Context, what string, tx *transaction.Transaction) error {
 	if s.l.settle == nil {
-		return nil, 0, false, fmt.Errorf("%s: settle: no settlement leg", what)
+		return fmt.Errorf("%s: settle: no settlement leg", what)
 	}
 	if err := s.l.settle.Submit(ctx, tx); err != nil {
-		return nil, 0, false, fmt.Errorf("%s: settle: %w", what, err)
+		return fmt.Errorf("%s: settle: %w", what, err)
 	}
 	s.say("%s %s: sent via %s (%d bytes); waiting for its block", what, tx.TxID(), s.l.settle.Name(), tx.Size())
+	return nil
+}
+
+// awaitMined waits for a sent tx's block and gives tx its proof: from the
+// node when there is one, otherwise from the arcade installation that took
+// it.
+func (s *session) awaitMined(ctx context.Context, what string, tx *transaction.Transaction) (*transaction.MerklePath, uint32, error) {
 	if s.l.asset != nil {
-		mp, height, err = s.payer().Await(ctx, what, tx)
-	} else if mp, height, err = s.awaitArcade(ctx, tx); err == nil {
+		return s.payer().Await(ctx, what, tx)
+	}
+	mp, height, err := s.awaitArcade(ctx, tx)
+	if err == nil {
 		s.say("%s %s: mined at height %d", what, tx.TxID(), height)
 	}
-	if err != nil {
-		s.payer().Change(tx, 0, nil)
-		return nil, 0, true, fmt.Errorf("%s %s was sent, but its proof has not arrived (%w); its change is held until a later command collects the proof", what, tx.TxID(), err)
+	return mp, height, err
+}
+
+// settleMined sends tx and waits for its block. sent reports whether tx left
+// this machine, so a caller whose wait failed knows its coin is spent.
+func (s *session) settleMined(ctx context.Context, what string, tx *transaction.Transaction) (mp *transaction.MerklePath, height uint32, sent bool, err error) {
+	if err := s.submitTx(ctx, what, tx); err != nil {
+		return nil, 0, false, err
 	}
-	return mp, height, true, nil
+	mp, height, err = s.awaitMined(ctx, what, tx)
+	return mp, height, true, err
+}
+
+// settleToken settles a transition's token. Under proofs = async it returns
+// once the leg accepts. Under wait it waits for the block, and a wait that
+// runs out after the token was sent falls back to async: the token is spent
+// into, so the transition must be saved and published unmined, with its
+// proof collected later, rather than failing and leaving a state that still
+// names the token it spent.
+func (s *session) settleToken(ctx context.Context, tok *transaction.Transaction) (*transaction.MerklePath, uint32, error) {
+	if s.async() {
+		return s.payer().Settle(ctx, "token", tok)
+	}
+	mp, height, sent, err := s.settleMined(ctx, "token", tok)
+	if err != nil && sent {
+		s.say("token %s: sent, but no proof yet (%v); continuing unmined, the proof is collected by a later command", tok.TxID(), err)
+		return nil, 0, nil
+	}
+	return mp, height, err
 }
 
 // arcadeWait bounds awaitArcade. It is longer than a node wait, because an
@@ -943,7 +1063,7 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 	if s.walletFunds() {
 		mp, height, err = s.walletProof(ctx, "token", tok)
 	} else {
-		mp, height, err = s.payer().Settle(ctx, "token", tok)
+		mp, height, err = s.settleToken(ctx, tok)
 	}
 	now := time.Now().UTC()
 	if err != nil {
@@ -1372,6 +1492,15 @@ func cmdCreate(ctx context.Context, g *global, args []string, stdout, stderr *os
 	s.st = &owner.State{Acct: acct.String(), IdentityKeyHex: keyHex(s.primary)}
 	if prev != nil && prev.IdentityKeyHex == s.st.IdentityKeyHex {
 		s.st.Funding, s.st.Trees = prev.Funding, prev.Trees
+		// The attempt that minted the tree may have stopped before the hosts
+		// had it, and a host that never held the funding outputs never sees
+		// them spent: no kill would reach it. Posting it again is harmless
+		// (a host that holds it answers DUPLICATE).
+		if s.st.Funding != nil && !tf.dryRun {
+			if err := s.postTree(ctx, *s.st.Funding); err != nil {
+				return err
+			}
+		}
 	}
 	w := randomBytes()
 	b, err := body(nil, tf)
@@ -1746,71 +1875,49 @@ func cmdKill(ctx context.Context, g *global, args []string, stdout, stderr *os.F
 		return &exitError{1, "no funding trees recorded; nothing to sweep"}
 	}
 	for _, tr := range s.st.Trees {
-		// A tree published before it mined is kept as its BEEF; a sweep of
-		// it carries that ancestry like any other spender would.
-		tree, err := funding.Rebuild(tr.RawHex, tr.BumpHex, tr.BeefHex)
-		if err != nil {
-			return fmt.Errorf("tree %s: %w", tr.Txid, err)
-		}
-		signer, err := s.walletFor(tr.IdentityKeyHex)
+		sweep, fresh, err := s.sweepFor(ctx, tr, tf, stdout)
 		if err != nil {
 			return err
 		}
-		vouts := make([]uint32, 0, tr.Count)
-		for i := uint32(0); i < tr.Count; i++ {
-			vouts = append(vouts, i)
+		if sweep == nil { // a dry run printed it
+			continue
 		}
-		var sweep *transaction.Transaction
-		var height uint32
-		if s.walletFunds() {
-			if sweep, err = s.sweepViaWallet(ctx, signer, tree, vouts); err != nil {
-				return fmt.Errorf("sweep of %s: %w", tr.Txid, err)
-			}
-			s.say("sweep %s: %d funding output(s) of tree %s, funded by the wallet", sweep.TxID(), len(vouts), tr.Txid)
-			if _, height, err = s.waitProof(ctx, "sweep", sweep); err != nil {
-				return err
-			}
-		} else {
-			fee, err := s.take(ctx)
-			if err != nil {
-				return err
-			}
-			changeTo, err := s.signer.FundScript()
-			if err != nil {
-				return err
-			}
-			if sweep, err = carrier.Sweep(ctx, signer, g.cfg.Originator, tree, vouts, fee.Tx, fee.Vout, fee.Unlocker, changeTo, s.fees.SatPerByte, s.fees.Floor); err != nil {
-				s.giveBack()
-				return fmt.Errorf("sweep of %s: %w", tr.Txid, err)
-			}
-			s.say("sweep %s: %d funding output(s) of tree %s (%d bytes)", sweep.TxID(), len(vouts), tr.Txid, sweep.Size())
-			if tf.dryRun {
-				fmt.Fprintln(stdout, sweep.Hex())
-				s.giveBack()
-				continue
-			}
-			var sent bool
-			if _, height, sent, err = s.settleMined(ctx, "sweep", sweep); err != nil {
-				if !sent {
-					s.giveBack()
-				}
-				return err
-			}
-			s.payer().Change(sweep, height, sweep.MerklePath)
-		}
+		// Hosts learn of the kill from the sweep itself, mined or not, so it
+		// is posted before any wait: a slow block must not leave the records
+		// standing.
 		sb, err := sweep.AtomicBEEF(false)
 		if err != nil {
 			return err
 		}
 		res, err := s.l.facade.Submit(ctx, g.cfg.Topic, sb)
 		if err != nil {
-			return fmt.Errorf("publish sweep: %w", err)
+			return fmt.Errorf("publish sweep %s: %w (the sweep is sent and recorded; run kill again to re-post it)", sweep.TxID(), err)
 		}
-		fmt.Fprintf(stdout, "swept tree %s with %s (height %d); hosts answered admitted=%v duplicate=%v\n", tr.Txid, sweep.TxID(), height, res.Admitted, res.Duplicate)
+		where := "sent earlier"
+		if fresh {
+			where = "proof pending"
+			var mp *transaction.MerklePath
+			var height uint32
+			if s.walletFunds() {
+				mp, height, err = s.waitProof(ctx, "sweep", sweep)
+			} else {
+				mp, height, err = s.awaitMined(ctx, "sweep", sweep)
+			}
+			if err == nil {
+				where = fmt.Sprintf("height %d", height)
+				if !s.walletFunds() {
+					_, _ = s.pool.Prove(sweep.TxID().String(), funding.BumpHex(mp), height)
+				}
+			} else {
+				s.say("sweep %s: %v; its change is held until a later command collects the proof", sweep.TxID(), err)
+			}
+		}
+		fmt.Fprintf(stdout, "swept tree %s with %s (%s); hosts answered admitted=%v duplicate=%v\n", tr.Txid, sweep.TxID(), where, res.Admitted, res.Duplicate)
 	}
 	if !tf.dryRun {
 		s.st.Funding = nil
 		s.st.Trees = nil
+		s.st.Sweeps = nil
 		if err := owner.Save(g.cfg.Home, s.st); err != nil {
 			return err
 		}

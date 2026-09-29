@@ -65,6 +65,10 @@ func wocBEEF(ctx context.Context, network, txid string, timeout time.Duration) (
 	case resp.StatusCode == http.StatusNotFound, resp.StatusCode == http.StatusInternalServerError:
 		// WhatsOnChain answers an unknown transaction with a 500, not a 404.
 		return nil, fmt.Errorf("%s: WhatsOnChain (%s) has no such transaction (status %d); check the txid and the network, and import it once it is mined", txid, network, resp.StatusCode)
+	case resp.StatusCode == http.StatusUnprocessableEntity:
+		// WhatsOnChain serves BEEF only for a mined transaction, and says so
+		// in the body: nothing is wrong with the payment, it is only early.
+		return nil, fmt.Errorf("%s: not mined yet (WhatsOnChain: %s); import it once it has a block", txid, strings.TrimSpace(string(body[:min(len(body), 200)])))
 	case resp.StatusCode != http.StatusOK:
 		return nil, fmt.Errorf("WhatsOnChain: %s: status %d", txid, resp.StatusCode)
 	case len(body) > maxImportBEEF:
@@ -73,51 +77,63 @@ func wocBEEF(ctx context.Context, network, txid string, timeout time.Duration) (
 	return transaction.NewTransactionFromBEEFHex(string(bytes.TrimSpace(body)))
 }
 
-// importTxid adds the outputs of a mined transaction that pay this home's
-// fund address to the pool, with the transaction and its proof, so they can
-// be spent by an unmined transaction that must carry its parent. The proof
-// is verified against the header source first: an answer the headers do not
-// prove adds nothing.
-func importTxid(ctx context.Context, g *global, sg *bwallet.Signer, pool *bwallet.Pool, txid string) (int, uint64, uint32, error) {
+// fetchMined fetches a mined transaction with its proof, from the node's
+// asset API when one is configured and otherwise from WhatsOnChain, and
+// verifies the proof against the header source: an answer the headers do
+// not prove is an error. A transaction with no block yet is an error that
+// says so.
+func fetchMined(ctx context.Context, g *global, txid string) (*transaction.Transaction, error) {
 	txid = strings.ToLower(strings.TrimSpace(txid))
 	want, err := chainhash.NewHashFromHex(txid)
 	if err != nil || len(txid) != 64 {
-		return 0, 0, 0, usage("fund -txid: not a transaction id")
+		return nil, usage("not a transaction id: " + txid)
 	}
 	if g.cfg.HeaderURL == "" {
-		return 0, 0, 0, usage("fund -txid needs header_url: the proof is checked against it")
+		return nil, usage("needs header_url: the proof is checked against it")
 	}
 	var tx *transaction.Transaction
 	if g.cfg.Asset != "" {
 		asset := &nodeapi.Asset{Base: g.cfg.Asset}
 		raw, err := asset.TxRaw(ctx, txid)
 		if err != nil {
-			return 0, 0, 0, fmt.Errorf("node: %s: %w", txid, err)
+			return nil, fmt.Errorf("node: %s: %w", txid, err)
 		}
 		if tx, err = transaction.NewTransactionFromBytes(raw); err != nil {
-			return 0, 0, 0, err
+			return nil, err
 		}
 		if tx.MerklePath, _, err = asset.Proof(ctx, txid); err != nil {
-			return 0, 0, 0, fmt.Errorf("node: %s: its proof: %w", txid, err)
+			return nil, fmt.Errorf("node: %s: its proof: %w", txid, err)
 		}
 	} else if tx, err = wocBEEF(ctx, g.cfg.Network, txid, g.cfg.Timeout); err != nil {
-		return 0, 0, 0, err
+		return nil, err
 	}
 	if !tx.TxID().IsEqual(want) {
-		return 0, 0, 0, fmt.Errorf("the source answered transaction %s for %s", tx.TxID(), txid)
+		return nil, fmt.Errorf("the source answered transaction %s for %s", tx.TxID(), txid)
 	}
 	if tx.MerklePath == nil {
-		return 0, 0, 0, errors.New(txid + ": not mined yet; import it once it has a block")
+		return nil, errors.New(txid + ": not mined yet; try again once it has a block")
 	}
 	tracker := g.headers()
 	tracker.Timeout = g.cfg.Timeout
 	ok, err := tx.MerklePath.Verify(ctx, want, tracker)
 	if err != nil {
-		return 0, 0, 0, fmt.Errorf("%s: checking its proof: %w", txid, err)
+		return nil, fmt.Errorf("%s: checking its proof: %w", txid, err)
 	}
 	if !ok {
-		return 0, 0, 0, fmt.Errorf("%s: its proof is not in the header source at height %d", txid, tx.MerklePath.BlockHeight)
+		return nil, fmt.Errorf("%s: its proof is not in the header source at height %d", txid, tx.MerklePath.BlockHeight)
 	}
+	return tx, nil
+}
+
+// importTxid adds the outputs of a mined transaction that pay this home's
+// fund address to the pool, with the transaction and its proof, so they can
+// be spent by an unmined transaction that must carry its parent.
+func importTxid(ctx context.Context, g *global, sg *bwallet.Signer, pool *bwallet.Pool, txid string) (int, uint64, uint32, error) {
+	tx, err := fetchMined(ctx, g, txid)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	txid = tx.TxID().String()
 	fund, err := sg.FundScript()
 	if err != nil {
 		return 0, 0, 0, err

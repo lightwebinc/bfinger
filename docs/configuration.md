@@ -77,7 +77,7 @@ leg.
 | `facade` | none | none | every sending command and `publish -resume`: the overlay host base URL the objects are posted to (`<facade>/submit`). `publish -facade` overrides it for one run |
 | `settle` | none | none | every sending command: `tcp:<host:port>` (bare EF to an ingress, no acknowledgement), `rpc:<url>` (a node that acknowledges, with `rpc_user` and `rpc_pass`) or `arcade:<url>` (any ARC-compatible API; bfinger posts to `<url>/tx`) |
 | `arcade_key` | none | none | bearer token for the `arcade:` URL, sent nowhere else |
-| `proofs` | none | `wait` | `wait`: a transition returns once its token is mined and proven. `async`: once the network has accepted it; a later command collects the proof. `async` refuses `settle = tcp:` unless `funding = wallet` |
+| `proofs` | none | `wait` | `wait`: a transition returns once its token is mined and proven (a wait that runs out after the token was sent continues as `async`). `async`: once the network has accepted it; a later command collects the proof. `async` refuses `settle = tcp:` unless `funding = wallet` |
 | `rpc` | none | none | the node's JSON-RPC URL |
 | `asset` | none | none | the node's asset HTTP API (tips and proofs) |
 | `rpc_user` | none | `bitcoin` | the node's basic-auth user |

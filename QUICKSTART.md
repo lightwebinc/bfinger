@@ -59,8 +59,9 @@ for wallets that apps can talk to:
 - **BSV Browser** for phones: [browser.bsvb.tech](https://browser.bsvb.tech/)
 - The standard itself: [BRC-100](https://github.com/bsv-blockchain/BRCs/blob/master/wallet/0100.md)
 
-When the payment has one confirmation (about ten minutes), import it by its
-transaction id, which your wallet shows:
+When the payment has one confirmation (usually about ten minutes; until then
+`fund -txid` answers `not mined yet`), import it by its transaction id, which
+your wallet shows:
 
 ```console
 $ bfinger fund -txid 1111…1111

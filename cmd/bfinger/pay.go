@@ -18,6 +18,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/spv"
 	"github.com/bsv-blockchain/go-sdk/transaction"
 
+	"github.com/lightwebinc/bcommon/funding"
 	"github.com/lightwebinc/bcommon/resolve"
 	"github.com/lightwebinc/bfinger/internal/protocol/mint"
 	"github.com/lightwebinc/bfinger/internal/publisher/bwallet"
@@ -122,16 +123,11 @@ func cmdPay(ctx context.Context, g *global, args []string, stdout, stderr *os.Fi
 	}
 	var tx *transaction.Transaction
 	var vout uint32
-	var mp *transaction.MerklePath
-	var height uint32
 	if s.walletFunds() {
 		if tx, vout, err = s.paymentViaWallet(ctx, dest, sats); err != nil {
 			return err
 		}
 		s.say("payment %s: %d sat to %s (%s), derivation %q %q, funded by the wallet", tx.TxID(), sats, name, abbrev(recipientHex), prefix, suffix)
-		if mp, height, err = s.waitProof(ctx, "payment", tx); err != nil {
-			return err
-		}
 	} else {
 		fee, err := s.take(ctx)
 		if err != nil {
@@ -151,33 +147,59 @@ func cmdPay(ctx context.Context, g *global, args []string, stdout, stderr *os.Fi
 			s.giveBack()
 			return nil
 		}
-		var sent bool
-		if mp, height, sent, err = s.settleMined(ctx, "payment", tx); err != nil {
-			if !sent {
-				s.giveBack()
-			}
+		if err := s.submitTx(ctx, "payment", tx); err != nil {
+			s.giveBack()
 			return err
 		}
-		s.payer().Change(tx, height, tx.MerklePath)
 	}
-	beef, err := tx.AtomicBEEF(false)
+	// The payment is sent. Its notice is written now, unmined, so that a wait
+	// that runs out still leaves the payee something to claim: the notice
+	// carries the payment's ancestry, and receive fetches the proof by txid
+	// once the payment has a block. It is rewritten with the proof below.
+	notice := func(height uint32) (string, error) {
+		beef, err := tx.AtomicBEEF(false)
+		if err != nil {
+			return "", err
+		}
+		n := Notice{Protocol: "brc29", SenderKeyHex: keyHex(s.primary), RecipientKeyHex: recipientHex,
+			DerivationPrefix: prefix, DerivationSuffix: suffix, Txid: tx.TxID().String(), Vout: vout, Satoshis: sats,
+			BeefHex: hex.EncodeToString(beef), Height: height, SentAt: time.Now().UTC()}
+		dir := filepath.Join(g.cfg.Home, "payments")
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return "", err
+		}
+		raw, _ := json.MarshalIndent(n, "", "  ")
+		path := filepath.Join(dir, n.Txid+".json")
+		return path, os.WriteFile(path, append(raw, '\n'), 0o600)
+	}
+	path, err := notice(0)
 	if err != nil {
-		return err
+		if !s.walletFunds() {
+			s.payer().Change(tx, 0, nil)
+		}
+		return fmt.Errorf("payment %s was sent, but its notice could not be written: %w", tx.TxID(), err)
 	}
-	_ = mp
-	n := Notice{Protocol: "brc29", SenderKeyHex: keyHex(s.primary), RecipientKeyHex: recipientHex,
-		DerivationPrefix: prefix, DerivationSuffix: suffix, Txid: tx.TxID().String(), Vout: vout, Satoshis: sats,
-		BeefHex: hex.EncodeToString(beef), Height: height, SentAt: time.Now().UTC()}
-	dir := filepath.Join(g.cfg.Home, "payments")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return err
+	var mp *transaction.MerklePath
+	var height uint32
+	if s.walletFunds() {
+		mp, height, err = s.waitProof(ctx, "payment", tx)
+	} else {
+		mp, height, err = s.awaitMined(ctx, "payment", tx)
 	}
-	raw, _ := json.MarshalIndent(n, "", "  ")
-	path := filepath.Join(dir, n.Txid+".json")
-	if err := os.WriteFile(path, append(raw, '\n'), 0o600); err != nil {
-		return err
+	if err != nil {
+		if !s.walletFunds() {
+			s.payer().Change(tx, 0, nil)
+		}
+		fmt.Fprintf(stdout, "paid %d sat to %s\n  txid   %s (sent, proof pending: %v)\n  notice %s\n", sats, name, tx.TxID(), err, path)
+		return nil
 	}
-	fmt.Fprintf(stdout, "paid %d sat to %s\n  txid   %s (height %d)\n  notice %s\n", sats, name, n.Txid, height, path)
+	if !s.walletFunds() {
+		s.payer().Change(tx, height, mp)
+	}
+	if path, err = notice(height); err != nil {
+		return fmt.Errorf("payment %s mined, but its notice could not be rewritten: %w", tx.TxID(), err)
+	}
+	fmt.Fprintf(stdout, "paid %d sat to %s\n  txid   %s (height %d)\n  notice %s\n", sats, name, tx.TxID(), height, path)
 	return nil
 }
 
@@ -235,6 +257,19 @@ func cmdReceive(ctx context.Context, g *global, args []string, stdout, stderr *o
 	if txid.String() != n.Txid || int(n.Vout) >= len(tx.Outputs) {
 		return &exitError{1, "notice txid or output does not match its BEEF"}
 	}
+	// A notice written before the payment mined carries its ancestry, not
+	// its proof. The coin is held only with a proof, so the mined payment is
+	// fetched by txid (as fund -txid does) and used instead.
+	if tx.MerklePath == nil {
+		mined, err := fetchMined(ctx, g, n.Txid)
+		if err != nil {
+			return &exitError{1, "the payment has no proof yet: " + err.Error()}
+		}
+		tx = mined
+		if beef, err = tx.AtomicBEEF(false); err != nil {
+			return err
+		}
+	}
 	tracker := g.headers()
 	tracker.Timeout = g.cfg.Timeout
 	ok, err := spv.Verify(ctx, tx, tracker, nil)
@@ -268,7 +303,7 @@ func cmdReceive(ctx context.Context, g *global, args []string, stdout, stderr *o
 		return nil
 	}
 	added, err := pool.Add(bwallet.Output{TxID: n.Txid, Vout: n.Vout, Satoshis: out.Satoshis,
-		LockingScript: out.LockingScript.String(), Height: height, Raw: tx.Hex(), Derivation: d})
+		LockingScript: out.LockingScript.String(), Height: height, Raw: tx.Hex(), Bump: funding.BumpHex(tx.MerklePath), Derivation: d})
 	if err != nil {
 		return err
 	}

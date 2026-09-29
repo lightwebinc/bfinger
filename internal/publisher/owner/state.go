@@ -173,6 +173,10 @@ type State struct {
 	// Trees is every funding tree this identity has minted, current one
 	// included, so the kill switch can sweep them all.
 	Trees []Funding `json:"trees,omitempty"`
+	// Sweeps holds, by funding tree txid, the atomic BEEF of a kill sweep
+	// that was sent but whose kill has not finished, so a rerun re-posts
+	// that sweep instead of building a second, conflicting one.
+	Sweeps map[string]string `json:"sweeps,omitempty"`
 
 	// Body is the current profile, kept so an update can edit one field.
 	Body map[string]any `json:"body,omitempty"`
