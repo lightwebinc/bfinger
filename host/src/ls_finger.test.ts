@@ -192,6 +192,43 @@ test('a host fed unspent outputs only rebuilds the chain once the burst settles'
   assert.ok(host.logged.some((l) => l.msg === 'ls_finger rebuilt its chains from the index'))
 })
 
+// Two conflicting transitions at one sequence: the live join takes the one
+// whose token spent the current token, and a rebuild must keep that one even
+// when the other sorts first by commitment.
+test('a rebuild keeps the transition whose token spent the chain, not the lower commitment', async () => {
+  const { ls, p } = fresh()
+  const m = minter(p.g.privateKeyHex)
+  createThenUpdate(ls, p)
+  const seq3 = (b: number) =>
+    record({
+      identityKey: fromHex(p.g.identityKeyHex),
+      seq: 3n,
+      kind: KindUpdate,
+      prev: fromHex(p.g.carrier2CHex),
+      prevWitness: fromHex(p.g.witness2Hex),
+      wc: sha256(fill(b)),
+    })
+  const cA = await mintCarrier(m, seq3(0x77), fundingAt(4))
+  const tA = await mintToken(m, commitment(cA), [{ txid: p.token2.id('hex'), vout: 0 }])
+  spend(ls, p.token2, tA)
+  admit(ls, tA)
+  admit(ls, cA)
+  const want = await ask(ls, p.g.identityKeyHex)
+  assert.equal(want[1], key(cA))
+  // A rival at seq 3 whose commitment sorts before cA's, and whose token
+  // spent nothing the chain holds.
+  let cB = cA
+  for (let b = 0x10; ; b++) {
+    cB = await mintCarrier(m, seq3(b), fundingAt(5))
+    if (toHex(commitment(cB)) < toHex(commitment(cA))) break
+  }
+  const tB = await mintToken(m, commitment(cB), [{ txid: p.funding.id('hex'), vout: 3 }])
+  admit(ls, tB)
+  admit(ls, cB)
+  ls.rebuildChains()
+  assert.deepEqual(await ask(ls, p.g.identityKeyHex), want)
+})
+
 test('a rebuild leaves a live chain as it was', async () => {
   const { ls, p } = fresh()
   createThenUpdate(ls, p)

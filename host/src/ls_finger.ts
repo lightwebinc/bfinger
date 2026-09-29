@@ -780,9 +780,23 @@ export class FingerLookupService implements LookupService {
     const before = this.joined.size
     this.states.clear()
     this.joined.clear()
+    // Two carriers at one sequence of one chain are conflicting transitions;
+    // advance keeps whichever it meets first. Meet first the one whose token
+    // is known to have spent a token (the spend notifications kept live),
+    // which is the one the chain actually took, and fall back to commitment
+    // order only when neither is known.
+    const spenders = new Set(this.spentBy.values())
+    const taken = (c: CarrierEntry): number => {
+      const t = this.tokenFor(c.cHex, c.identityKeyHex)
+      return t !== undefined && spenders.has(t.outpoint.txid) ? 0 : 1
+    }
+    const order = [...this.carriers.values()].sort((a, b) => {
+      if (a.record.seq !== b.record.seq) return a.record.seq < b.record.seq ? -1 : 1
+      return taken(a) - taken(b) || (a.cHex < b.cHex ? -1 : a.cHex > b.cHex ? 1 : 0)
+    })
     this.rebuilding = true
     try {
-      for (const carrier of this.carriersInOrder()) this.advance(carrier, this.tokenFor(carrier.cHex, carrier.identityKeyHex), true)
+      for (const carrier of order) this.advance(carrier, this.tokenFor(carrier.cHex, carrier.identityKeyHex), true)
     } finally {
       this.rebuilding = false
     }
