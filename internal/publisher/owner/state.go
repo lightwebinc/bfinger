@@ -173,10 +173,12 @@ type State struct {
 	// Trees is every funding tree this identity has minted, current one
 	// included, so the kill switch can sweep them all.
 	Trees []Funding `json:"trees,omitempty"`
-	// Sweeps holds, by funding tree txid, the atomic BEEF of a kill sweep
-	// that was sent but whose kill has not finished, so a rerun re-posts
-	// that sweep instead of building a second, conflicting one.
-	Sweeps map[string]string `json:"sweeps,omitempty"`
+	// Sweeps holds, by funding tree txid, each kill sweep sent and not yet
+	// proven: a rerun of kill re-posts that sweep instead of building a
+	// second, conflicting one, and proof collection posts it again once it
+	// mines, so hosts hold the proven copy (a peer catching up by GASP is
+	// served that copy).
+	Sweeps map[string]Sweep `json:"sweeps,omitempty"`
 
 	// Body is the current profile, kept so an update can edit one field.
 	Body map[string]any `json:"body,omitempty"`
@@ -191,6 +193,13 @@ type State struct {
 }
 
 // File is the state file name under the home directory.
+// Sweep is a kill sweep kept until it is proven.
+type Sweep struct {
+	Txid    string `json:"txid"`
+	RawHex  string `json:"rawHex"`
+	BeefHex string `json:"beefHex"`
+}
+
 const File = "state.json"
 
 // Load reads the state; a missing file returns (nil, nil), the state of an

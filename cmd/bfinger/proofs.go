@@ -90,6 +90,12 @@ func (s *session) catchUpProofs(ctx context.Context) {
 			},
 		})
 	}
+	for treeTxid, sw := range s.st.Sweeps {
+		items = append(items, producer.Pending{
+			What: "kill sweep", Txid: sw.Txid, RawHex: sw.RawHex, BeefHex: sw.BeefHex,
+			Proven: func(*transaction.MerklePath, uint32) { delete(s.st.Sweeps, treeTxid) },
+		})
+	}
 	// The current token's journal entry is the token item's; any other entry
 	// still waiting is a transition superseded before its own proof was
 	// collected, which mined all the same.

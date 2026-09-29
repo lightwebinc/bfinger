@@ -521,8 +521,8 @@ func (s *session) say(format string, a ...any) { fmt.Fprintf(s.stderr, format+"\
 // state before it returns, with its change held unproven. A dry run prints
 // the sweep and returns nil.
 func (s *session) sweepFor(ctx context.Context, tr owner.Funding, tf *transitionFlags, stdout *os.File) (*transaction.Transaction, bool, error) {
-	if bh := s.st.Sweeps[tr.Txid]; bh != "" {
-		sweep, err := transaction.NewTransactionFromBEEFHex(bh)
+	if rec, ok := s.st.Sweeps[tr.Txid]; ok {
+		sweep, err := transaction.NewTransactionFromBEEFHex(rec.BeefHex)
 		if err != nil {
 			return nil, false, fmt.Errorf("recorded sweep of %s: %w", tr.Txid, err)
 		}
@@ -579,9 +579,9 @@ func (s *session) sweepFor(ctx context.Context, tr owner.Funding, tf *transition
 		return nil, false, err
 	}
 	if s.st.Sweeps == nil {
-		s.st.Sweeps = map[string]string{}
+		s.st.Sweeps = map[string]owner.Sweep{}
 	}
-	s.st.Sweeps[tr.Txid] = hex.EncodeToString(beef)
+	s.st.Sweeps[tr.Txid] = owner.Sweep{Txid: sweep.TxID().String(), RawHex: sweep.Hex(), BeefHex: hex.EncodeToString(beef)}
 	if err := owner.Save(s.g.cfg.Home, s.st); err != nil {
 		return nil, false, fmt.Errorf("sweep %s was sent, but recording it failed: %w", sweep.TxID(), err)
 	}
@@ -1908,6 +1908,13 @@ func cmdKill(ctx context.Context, g *global, args []string, stdout, stderr *os.F
 				if !s.walletFunds() {
 					_, _ = s.pool.Prove(sweep.TxID().String(), funding.BumpHex(mp), height)
 				}
+				// Hosts hold the unmined copy posted above; the proven one
+				// replaces it, and is what a peer catching up is served.
+				if pb, perr := sweep.AtomicBEEF(false); perr == nil {
+					if _, perr = s.l.facade.Submit(ctx, g.cfg.Topic, pb); perr == nil {
+						delete(s.st.Sweeps, tr.Txid)
+					}
+				}
 			} else {
 				s.say("sweep %s: %v; its change is held until a later command collects the proof", sweep.TxID(), err)
 			}
@@ -1917,7 +1924,7 @@ func cmdKill(ctx context.Context, g *global, args []string, stdout, stderr *os.F
 	if !tf.dryRun {
 		s.st.Funding = nil
 		s.st.Trees = nil
-		s.st.Sweeps = nil
+		// Sweeps not yet proven stay, for proof collection to post again.
 		if err := owner.Save(g.cfg.Home, s.st); err != nil {
 			return err
 		}
