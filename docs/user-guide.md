@@ -248,6 +248,7 @@ proof (section 8), which can be well after the block.
 | `RECORD-PENDING` | The token verified; the carrier it commits to has not reached this host. | Wait, or ask another host. |
 | `NO-TOKEN` | Nothing for this identity, or only carriers. For a store: no such carrier, or committed to but not linked. | Correct for a killed identity. Otherwise check the key and host. |
 | `REFUSED-DECODE` | Something did not parse, an output is neither token nor carrier, or a token's input script or ancestry fails. | Suspect the host or a version skew. |
+| `REFUSED-UNLOCKING` | The carrier's input is not one canonical signature push (a high-S or re-encoded signature, an extra push). | A re-encoded copy of a carrier; the owner's own tool never writes one. Do not trust it. |
 | `REFUSED-KEY-DERIVE` | A locking key is not derived from the record's identity. | Do not trust it. |
 | `REFUSED-SIG` | A signature fails, or a carrier input does not satisfy its funding output. | Do not trust it. Tell the host operator. |
 | `REFUSED-KEY` | The key is not the one the domain resolved; or not the pinned one with no followable rotation; or the previous record names another identity; or first contact was declined (no terminal and no `-yes` included). | Check out of band. After a rotation the domain must name the new key. |

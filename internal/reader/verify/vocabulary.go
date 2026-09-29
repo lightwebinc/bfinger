@@ -21,6 +21,7 @@ const (
 	RefusedDecode    = bcverify.RefusedDecode
 	RefusedKeyDerive = bcverify.RefusedKeyDerive
 	RefusedSig       = bcverify.RefusedSig
+	RefusedUnlocking = bcverify.RefusedUnlocking
 	RefusedKey       = bcverify.RefusedKey
 	RefusedSeq       = bcverify.RefusedSeq
 	RefusedFork      = bcverify.RefusedFork

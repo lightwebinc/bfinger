@@ -93,8 +93,14 @@ key from the identity key alone. Below, `derive(id, "record")` is that key.
 
 `K_n` is a transaction with:
 
-- **input 0**: spends one output of a funding tree `F`, locked to
-  `derive(identityKey, "record")`. `nSequence = 0`.
+- **input 0**, the only input: spends one output of a funding tree `F`,
+  locked to `derive(identityKey, "record")`. `nSequence = 0`. Its unlocking
+  script is exactly one direct push (opcode 0x01 to 0x4b) of a strict-DER
+  (BIP 66) signature with `S` at most `n/2` (low-S) and `R`, `S` in range,
+  followed by the sighash byte 0x41, and nothing else. Any other encoding
+  would sign the same transaction under a different txid, so a third party
+  could make a twin of the carrier; readers and hosts refuse it
+  (`non-canonical-unlocking`, `REFUSED-UNLOCKING`).
 - **output 0**: PushDrop `[S_n]`, lock-before, under the same key, with the
   field signature `Lock` appends (a DER signature over `SHA-256(S_n)` as
   pushed). It carries the whole value of the funding output it spends, so the
@@ -330,7 +336,8 @@ anyone. Upgrading a funding tree also upgrades every carrier that spent it.
   are skipped; two record outputs refuse the carrier); `S` decodes and passes
   its kind's own shape (§2, §4.3); `nLockTime >= 4102444800` and every input's
   `nSequence < 0xFFFFFFFF` (a mineable carrier is refused, since the record
-  could reach the chain); the locking key equals
+  could reach the chain); one input, whose unlocking script is canonical
+  (§1, `non-canonical-unlocking`); the locking key equals
   `derive(S.identityKey, "record")`; the field signature over `SHA-256(S)`
   verifies under it.
 - **funding output**: exactly PushDrop `["bf" + 0x02]` with no signature, in
@@ -434,7 +441,8 @@ must decide a carrier's standing without a host would consult a UTXO index
    A token with no proof yet verifies through its ancestry and the result is
    `VERIFIED-UNMINED` rather than `VERIFIED`.
 4. Carrier: the served carrier whose txid is `C` (none: `RECORD-PENDING`); SPV
-   through its funding parent; decode `S`; its kind's own shape; unmineable;
+   through its funding parent, after its one input's unlocking script is
+   found canonical (`REFUSED-UNLOCKING`); decode `S`; its kind's own shape; unmineable;
    locking key `derive(S.identityKey, "record")`; field signature.
 5. Token: locking key `derive(S.identityKey, "profile")`; field signature.
 6. Pin: `S.identityKey` equals the key the name resolved to; a retired pin

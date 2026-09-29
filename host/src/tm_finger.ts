@@ -22,7 +22,7 @@ import { inspectToken } from './token.js'
  * The refusal vocabulary. Fixed and small because it is a metric label; the
  * detail goes to the log, where an unbounded string belongs.
  */
-export const RefuseReasons = ['not-pushdrop', 'bad-tag', 'bad-sig', 'bad-record', 'bad-lock', 'mineable', 'other'] as const
+export const RefuseReasons = ['not-pushdrop', 'bad-tag', 'bad-sig', 'bad-record', 'bad-lock', 'mineable', 'non-canonical-unlocking', 'other'] as const
 export type RefuseReason = (typeof RefuseReasons)[number]
 
 /**

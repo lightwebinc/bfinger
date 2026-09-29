@@ -46,6 +46,7 @@ var (
 	ErrMineable   = bccarrier.ErrMineable
 	ErrLock       = bccarrier.ErrLock
 	ErrSignature  = bccarrier.ErrSignature
+	ErrUnlocking  = bccarrier.ErrUnlocking
 )
 
 // Params is finger's carrier: the record key under token.Protocol, the

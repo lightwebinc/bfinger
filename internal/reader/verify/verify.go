@@ -29,6 +29,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/bsv-blockchain/go-sdk/transaction/chaintracker"
 
+	bccarrier "github.com/lightwebinc/bcommon/carrier"
 	bcverify "github.com/lightwebinc/bcommon/verify"
 	"github.com/lightwebinc/bfinger/internal/protocol/carrier"
 	"github.com/lightwebinc/bfinger/internal/protocol/record"
@@ -199,6 +200,12 @@ func Verify(ctx context.Context, items []Item, opt Options) *Result {
 		r.step(string(RecordPending), false, r.Reason)
 		return r
 	}
+	// The carrier's one input must be a canonical signature push before
+	// anything else is judged: a re-encoded twin signs the same transaction
+	// under another txid.
+	if err := bccarrier.CheckUnlocking(cur.tx); err != nil {
+		return r.refuse(RefusedUnlocking, "carrier: "+err.Error())
+	}
 	switch k, err := bcverify.Check(ctx, cur.tx, opt.Tracker); k {
 	case bcverify.ProofRefused:
 		return r.refuse(RefusedBump, "the carrier's funding parent is not proven in the header source")
@@ -212,6 +219,8 @@ func Verify(ctx context.Context, items []Item, opt Options) *Result {
 	}
 	if err := cur.carrier.Validate(); err != nil {
 		switch {
+		case errors.Is(err, carrier.ErrUnlocking):
+			return r.refuse(RefusedUnlocking, "carrier: "+err.Error())
 		case errors.Is(err, carrier.ErrMineable):
 			return r.refuse(RefusedMineable, err.Error())
 		case errors.Is(err, carrier.ErrLock):
