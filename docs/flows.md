@@ -356,20 +356,22 @@ reading none of them.
 ```mermaid
 flowchart TD
   TX["one signed token, and two BEEF objects"] --> L1["settlement leg"]
-  TX --> L2["object leg"]
   L1 --> EF["tcp: EF in ONE write on a fresh connection, no acknowledgement"]
   L1 --> RPC["rpc: hex to a node, acknowledged, the txid must match"]
   L1 --> ARC["arcade: EF to POST /tx, up to 15 s for the network's verdict, a refusal is an error"]
   EF --> MINE{"proofs"}
   RPC --> MINE
   ARC --> MINE
-  MINE -->|"wait"| POLL["poll the node's asset API every 5 s, up to 10 min"]
+  MINE -->|"wait"| POLL["poll for the proof: 10 min from a node, 1 h from arcade; running out continues unmined"]
   MINE -->|"async, not with tcp"| GO["go on, the proof is collected by a later command"]
-  L2 --> POST["POST each atomic BEEF to the facade, one x-topics header"]
-  POST --> STEAK["a 200 that admits nothing is reported as DUPLICATE"]
-  POLL --> STATE["state.json is saved after both objects are posted"]
+  POLL --> STATE["state.json saved: the token is settled"]
   GO --> STATE
-  STEAK --> STATE
+  STATE --> L2["object leg"]
+  L2 --> POST["POST each atomic BEEF to the facade, one x-topics header"]
+  POST --> STEAK{"200 admitting nothing?"}
+  STEAK -->|"yes"| CHECK["ask host or the manifest's ls_finger for the carrier or token"]
+  CHECK -->|"not held"| REF["refused by the host: error, publish -resume after fixing"]
+  CHECK -->|"held"| DONE["DUPLICATE, already held"]
 ```
 
 The legs never share a connection, and no function in `publish` accepts both

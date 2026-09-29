@@ -102,8 +102,10 @@ the order and what each step leaves behind.
    names a token already spent.
 6. **Object leg**: any store carriers, the carrier's atomic BEEF (with its
    funding parent's proof, or its ancestry while unmined), then the token's, to
-   the facade. A 200 that admits nothing is reported as `DUPLICATE`, not
-   failed. If a post fails, `publish -resume` re-sends them from the state.
+   the facade. A 200 that admits nothing is either already held or refused,
+   so bfinger asks the lookup host (`host`, else the manifest's `ls_finger`)
+   for the carrier or token: held is `DUPLICATE`, not held is an error. If a
+   post fails, `publish -resume` re-sends them from the state.
 
 ## Rotation
 

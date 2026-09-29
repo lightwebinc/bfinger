@@ -1091,27 +1091,21 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 	if err != nil {
 		return err
 	}
-	objects := make([]struct {
+	// tx is set for the objects a DUPLICATE answer is checked for.
+	type object struct {
 		name string
 		beef []byte
-	}, 0, len(subs)+2)
+		tx   *transaction.Transaction
+	}
+	objects := make([]object, 0, len(subs)+2)
 	for _, m := range subs {
 		sb, err := m.tx.AtomicBEEF(false)
 		if err != nil {
 			return err
 		}
-		objects = append(objects, struct {
-			name string
-			beef []byte
-		}{"store " + m.name, sb})
+		objects = append(objects, object{name: "store " + m.name, beef: sb})
 	}
-	objects = append(objects, struct {
-		name string
-		beef []byte
-	}{"carrier", cb}, struct {
-		name string
-		beef []byte
-	}{"token", tb})
+	objects = append(objects, object{"carrier", cb, k}, object{"token", tb, tok})
 	prevC, prevRaw := s.st.CarrierTxid, s.st.CarrierRawHex
 	promoted := s.st.PendingSuccessor != "" && keyHex(s.signer) == s.st.PendingSuccessor
 	oldSeq := s.st.Seq
@@ -1199,6 +1193,17 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 		stamp(func(e *publish.Entry) { e.BEEFSentAt, e.BEEFSteak = &sent, res.Raw })
 		if res.Duplicate {
 			s.say("%s: facade answered DUPLICATE (already held)", o.name)
+			if o.tx != nil {
+				held, where, err := s.confirmHeld(ctx, o.tx, o.name == "carrier")
+				switch {
+				case err != nil:
+					s.say("%s: could not confirm the host holds it: %v", o.name, err)
+				case !held:
+					return fmt.Errorf("publish %s: the facade answered DUPLICATE but %s does not hold it: the host refused it (its log names the reason)", o.name, where)
+				default:
+					s.say("%s: confirmed held at %s", o.name, where)
+				}
+			}
 		} else if len(res.Admitted) == 0 {
 			return fmt.Errorf("publish %s: the topic manager admitted nothing: %s (the transition is settled and saved; `bfinger publish -resume` re-sends its objects)", o.name, string(res.Raw))
 		} else {
