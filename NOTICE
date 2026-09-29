@@ -1,0 +1,149 @@
+bfinger
+Copyright 2026 Lightweb Inc. (https://lightweb.net)
+
+=========================================================================
+
+bfinger looks up a person or service by an address of the familiar
+user@domain form and tells you what that address currently claims about
+itself, with the claim's authenticity checked rather than assumed.
+
+The address resolves at its own domain, which publishes an identity key
+and names the overlay host that serves it. The claim itself is a record
+held by that overlay, committed to the chain by a small mined token that
+carries a hash and nothing else. bfinger reads both, checks that the
+record is the one the token commits to, checks both signatures against
+keys derived from the identity the record names, checks that the update
+follows the one before it and is not expired, and checks the token's
+merkle proof against block headers it obtained for itself. Nothing in
+that chain asks the reader to trust the host that served the answer: a
+host can withhold, but it cannot forge.
+
+The key is pinned on first contact, and every later answer is checked
+against that pin. A changed key is refused unless the change is signed by
+the key that was pinned. This is the part that makes the tool worth
+having: an identity system whose keys can be swapped silently by whoever
+serves the lookup is not an identity system.
+
+=========================================================================
+Third-Party Standards
+
+  BRC-9:   Simplified Payment Verification
+  BRC-22:  Overlay Network Data Synchronization
+  BRC-24:  Overlay Network Lookup Services
+  BRC-29:  Simple Authenticated BSV P2PKH Payment Protocol
+  BRC-42:  BSV Key Derivation Scheme
+  BRC-43:  Security Levels, Protocol IDs, Key IDs and Counterparties
+  BRC-48:  Pay to Push Drop
+  BRC-62:  Background Evaluation Extended Format
+  BRC-67:  Simplified Payment Verification
+  BRC-74:  BSV Unified Merkle Path
+  BRC-95:  Atomic BEEF
+  BRC-100: Wallet-to-Application Interface
+  BRC-169: Universal Handle Addressing and Resolution
+  BRC-180: Overlay Service Discovery at an Internet Domain
+  BRC-220: Merkle Root Commitment
+  BSV Blockchain Standards Repository
+  https://github.com/bsv-blockchain/BRCs/
+
+  RFC 6962: Certificate Transparency (Merkle tree construction)
+  https://www.rfc-editor.org/rfc/rfc6962
+  RFC 8949: Concise Binary Object Representation (CBOR)
+  https://www.rfc-editor.org/rfc/rfc8949
+
+=========================================================================
+Interoperability
+
+bfinger speaks published standards and holds no private protocol. Any
+wallet that implements BRC-100 can hold the key it signs with; any
+overlay host that implements BRC-22 and BRC-24 can carry the objects and
+answer for them; any domain that publishes a BRC-169 manifest can publish
+the address mapping. Nothing here requires a particular network operator,
+and a record published through this tool remains readable by anything
+that can read the chain and reach a host that holds it.
+
+=========================================================================
+Third-Party Software
+
+This product includes third-party software, distributed under the terms
+of their respective licenses. Each dependency retains its own copyright;
+this notice does not modify those licenses.
+
+  github.com/bsv-blockchain/go-sdk             Open BSV License Version 5, MIT License
+  github.com/lightwebinc/bcommon               Apache License 2.0
+  github.com/mrz1836/go-whatsonchain           MIT License
+  github.com/pkg/errors                        BSD License
+  github.com/stretchr/testify                  MIT License
+  go.yaml.in/yaml/v3                           MIT License, Apache License 2.0
+  golang.org/x/crypto                          BSD License
+
+Two DIRECT dependencies, github.com/lightwebinc/bcommon and
+github.com/bsv-blockchain/go-sdk, are a rule this repository enforces in
+CI, and they are why the list is short. bcommon is Lightweb Inc.'s
+library of the generic building blocks bfinger is made from, published
+separately under Apache-2.0; CI also asserts that its own only direct
+dependency is go-sdk, so it adds no module of its own. That is not why
+the list is seven lines rather than two: go-sdk brings the other five
+with it, four imported by its own packages and go.yaml.in/yaml/v3
+through testify, and a statically linked binary contains them whether
+they were asked for directly or not. The direct/indirect distinction is
+a dependency-management idea and has no bearing on what is inside the
+artefact.
+
+The overlay host modules under host/ are a separate npm package, and
+what is deployed from it is one file, host/bundle/index.js. That file
+contains the modules' own code and the TypeScript code of
+@lightwebinc/bcommon, the npm package of the same library, which is
+Lightweb Inc.'s and Apache-2.0; its attribution notice is the one
+reproduced below for github.com/lightwebinc/bcommon. It contains no other
+third-party code: its build fails if any input lies outside host/src/ and
+that package. @bsv/sdk is not in it. The file imports @bsv/sdk by bare
+specifier from the overlay host's own installation, so the obligation for
+@bsv/sdk belongs to whoever installs it, which is the host operator. The
+npm @bsv packages are under the Open BSV License Version 6, whose
+attribution is "© BSV Association" without the comma, not the Version 5
+line below.
+
+© BSV Association,
+
+The attribution line above is reproduced verbatim as the Open BSV License
+Version 5 requires it, for github.com/bsv-blockchain/go-sdk. Note the
+version. The Go go-sdk is under Version 5, which requires that text with
+the comma inside it; the npm @bsv packages are under Version 6, which
+requires it without the comma and narrows the field of use. A reader
+carrying this notice to another repository must check which applies
+there rather than assume.
+
+Two terms of that license are worth stating in plain words, because they
+do not match the permissive licenses usually found beside it: the grant
+is made on a revocable basis, and the software it covers, together with
+anything derived from it, must only be used on the BSV Blockchains.
+Non-compliance extinguishes the license. Those terms bind this product's
+use of that dependency. They do not extend to Lightweb Inc.'s own source,
+which is Apache-2.0 as stated in LICENSE.
+
+The full text of every license above is reproduced verbatim in
+LICENSE-THIRD-PARTY, which is GENERATED from what the binary actually
+links rather than maintained by hand.
+
+Every one of them requires its own text to reach whoever receives a
+binary, not only whoever receives source: Open BSV in condition 1, MIT in
+"all copies or substantial portions", BSD in its binary-redistribution
+clause and Apache-2.0 in section 4. Static linking discards every one of
+those files, so the generated bundle is what discharges the obligation
+and it must ship with any release artefact and inside any image.
+
+Section 4(d) of the Apache License asks for more than its text: where a
+module ships a NOTICE file, its attribution notices travel too. Two of
+the modules above ship one, and their attribution notices are these:
+
+  go.yaml.in/yaml/v3
+    Copyright 2011-2016 Canonical Ltd.
+
+  github.com/lightwebinc/bcommon
+    bcommon
+    Copyright 2026 Lightweb Inc. (https://lightweb.net)
+
+bcommon's NOTICE also carries go-sdk's Open BSV attribution line, which
+is reproduced above.
+
+=========================================================================

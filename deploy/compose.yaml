@@ -1,0 +1,119 @@
+# A finger host: the overlay host with the finger module, its database, and a
+# TLS front that also answers handle resolution for your domain.
+#
+#   mkdir site
+#   HOST=finger.example.com docker compose up -d
+#
+# HOST is this server's DNS name (several, comma-separated, are allowed); its
+# A/AAAA record must point here before the first start, because Caddy gets the
+# certificate then. ./site holds what `bfinger domain-docs` writes (the resolve
+# answers and, if your domain's apex points here too, manifest.json). Create it
+# before the first start: Docker creates a missing one owned by root.
+#
+# Optional: HEADERS, the host's header source (default woc:main, or
+# chaintracks:https://headers.example.com/v2 for one you run); NETWORK (main,
+# test or regtest; default the source's own); ADMIN_TOKEN (default a random one
+# per start); DB_PASSWORD (the database is never published outside this
+# project's network); FINGER_HOST_IMAGE; SYNC_PEERS (hosts to catch up from,
+# tm_finger=https://other-host.example.net). See docs/self-host.md.
+
+name: finger
+
+services:
+  db:
+    image: mysql:9@sha256:30a0abfa7b502a496e12339b54cd07aaa70363396dc4b8e8a72a92804a505cd6
+    environment:
+      MYSQL_DATABASE: overlay
+      MYSQL_USER: overlay
+      MYSQL_PASSWORD: ${DB_PASSWORD:-overlay-internal}
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    volumes:
+      - db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uoverlay -p\"$$MYSQL_PASSWORD\" --silent"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+    restart: unless-stopped
+
+  host:
+    image: ${FINGER_HOST_IMAGE:-ghcr.io/lightwebinc/finger-host:latest}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      OVERLAY_KNEX_URL: mysql://overlay:${DB_PASSWORD:-overlay-internal}@db:3306/overlay
+      OVERLAY_CHAIN_TRACKER_URL: ${HEADERS:-woc:main}
+      OVERLAY_CHAIN_NETWORK: ${NETWORK:-}
+      OVERLAY_ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      OVERLAY_SYNC_PEERS: ${SYNC_PEERS:-}
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2@sha256:0c994536bddb66445885237f1a5dcc1916bccea922661c76b4e9fc24061f9b52
+    depends_on:
+      - host
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      HOST: ${HOST:?set HOST to this server's DNS name, e.g. HOST=finger.example.com}
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+    volumes:
+      - ./site:/srv/site:ro
+      - caddy:/data
+    restart: unless-stopped
+
+configs:
+  caddyfile:
+    content: |
+      {$$HOST} {
+        encode gzip
+
+        # Browsers may read everything here: the lookup service answers
+        # public data, and a web reader cannot ask it anything otherwise.
+        header Access-Control-Allow-Origin *
+        @preflight method OPTIONS
+        handle @preflight {
+          header Access-Control-Allow-Methods "GET, POST, OPTIONS"
+          header Access-Control-Allow-Headers "Content-Type, x-topics"
+          respond 204
+        }
+
+        # BRC-169 handle resolution: ?handle=alice answers the file
+        # `bfinger domain-docs` wrote for alice, and an unknown handle is a
+        # 404. A tagged or malformed handle is the client's to fix.
+        handle /.well-known/metanet-handles/resolve {
+          @valid expression `{query.handle}.matches("^[a-z0-9]([a-z0-9._-]{0,62}[a-z0-9])?$")`
+          handle @valid {
+            root * /srv/site
+            rewrite * /.well-known/metanet-handles/by-handle/{query.handle}.json
+            header Content-Type application/json
+            file_server
+          }
+          header Content-Type application/json
+          respond `{"metanetHandles":"1.0","error":{"code":"malformed-handle","message":"The handle parameter does not satisfy BRC-169 section 2.1."}}` 400
+        }
+        handle /manifest.json {
+          root * /srv/site
+          file_server
+        }
+
+        # The admin surface and metrics stay inside this project's network.
+        handle /admin/* {
+          respond 404
+        }
+        handle /metrics {
+          respond 404
+        }
+
+        handle {
+          reverse_proxy host:8080
+        }
+      }
+
+volumes:
+  db:
+  caddy:

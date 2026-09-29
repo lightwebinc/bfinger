@@ -1,0 +1,69 @@
+{
+  "acct": "user@example.com",
+  "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+  "seq": 4,
+  "kind": 2,
+  "tokenTxid": "8f2a4c6e8a0c2e4f6a8c0e2f4a6c8e0a2c4e6f8a0c2e4f6a8c0e2f4a6c8e0a2c",
+  "tokenRawHex": "0100000001bb",
+  "tokenBumpHex": "fe11270000",
+  "tokenHeight": 10001,
+  "carrierTxid": "3b5d7f91a3c5e7092b4d6f81a3c5e7092b4d6f81a3c5e7092b4d6f81a3c5e709",
+  "carrierRawHex": "0100000001cc",
+  "witness": "a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0",
+  "funding": {
+    "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+    "txid": "5d1e2c7a9b0f38e4a6c1d2e3f405162738495a6b7c8d9eafb0c1d2e3f4051627",
+    "rawHex": "0100000001aa",
+    "bumpHex": "fe10270000",
+    "height": 10000,
+    "sats": 1000,
+    "count": 8,
+    "next": 3
+  },
+  "trees": [
+    {
+      "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "txid": "5d1e2c7a9b0f38e4a6c1d2e3f405162738495a6b7c8d9eafb0c1d2e3f4051627",
+      "rawHex": "0100000001aa",
+      "bumpHex": "fe10270000",
+      "height": 10000,
+      "sats": 1000,
+      "count": 8,
+      "next": 3
+    }
+  ],
+  "body": {
+    "status": "available"
+  },
+  "stores": [
+    {
+      "name": "plan",
+      "head": "467a998ed42127ea660cf34997436dd9baa4288a9d9af67b62372148d1cdffee",
+      "count": 1,
+      "carriers": [
+        {
+          "c": "467a998ed42127ea660cf34997436dd9baa4288a9d9af67b62372148d1cdffee",
+          "txid": "eeffcdd1482137627bf69a9d8a28a4bad96d439749f30c66ea2721d48e997a46",
+          "rawHex": "0100000001dd",
+          "fundingTxid": "5d1e2c7a9b0f38e4a6c1d2e3f405162738495a6b7c8d9eafb0c1d2e3f4051627",
+          "kind": 5
+        }
+      ]
+    },
+    {
+      "name": "keys",
+      "head": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+      "count": 1,
+      "carriers": [
+        {
+          "c": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+          "txid": "201f1e1d1c1b1a191817161514131211100f0e0d0c0b0a090807060504030201",
+          "rawHex": "0100000001ee",
+          "fundingTxid": "5d1e2c7a9b0f38e4a6c1d2e3f405162738495a6b7c8d9eafb0c1d2e3f4051627",
+          "kind": 5
+        }
+      ]
+    }
+  ],
+  "updatedAt": "2026-09-27T12:34:56.123456789Z"
+}

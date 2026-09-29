@@ -1,0 +1,100 @@
+{
+  "acct": "user@example.com",
+  "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+  "seq": 12,
+  "kind": 3,
+  "tokenTxid": "8f2a4c6e8a0c2e4f6a8c0e2f4a6c8e0a2c4e6f8a0c2e4f6a8c0e2f4a6c8e0a2c",
+  "tokenRawHex": "0100000001bb",
+  "tokenBumpHex": "fe11270000",
+  "tokenHeight": 10001,
+  "tokenBeefHex": "0100beef01bb",
+  "carrierTxid": "3b5d7f91a3c5e7092b4d6f81a3c5e7092b4d6f81a3c5e7092b4d6f81a3c5e709",
+  "carrierRawHex": "0100000001cc",
+  "prevCarrierTxid": "91a3c5e7092b4d6f81a3c5e7092b4d6f81a3c5e7092b4d6f81a3c5e7092b4d6f",
+  "prevCarrierRawHex": "0100000001cd",
+  "witness": "a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0",
+  "pendingSuccessor": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+  "funding": {
+    "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+    "txid": "5d1e2c7a9b0f38e4a6c1d2e3f405162738495a6b7c8d9eafb0c1d2e3f4051627",
+    "rawHex": "0100000001aa",
+    "bumpHex": "fe10270000",
+    "beefHex": "0100beef01aa",
+    "height": 10000,
+    "sats": 1000,
+    "count": 8,
+    "next": 3,
+    "funder": "wallet"
+  },
+  "trees": [
+    {
+      "txid": "dfdedddcdbdad9d8d7d6d5d4d3d2d1d0cfcecdcccbcac9c8c7c6c5c4c3c2c1c0",
+      "rawHex": "0100000001ab",
+      "sats": 500,
+      "count": 4,
+      "next": 4
+    },
+    {
+      "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "txid": "5d1e2c7a9b0f38e4a6c1d2e3f405162738495a6b7c8d9eafb0c1d2e3f4051627",
+      "rawHex": "0100000001aa",
+      "bumpHex": "fe10270000",
+      "beefHex": "0100beef01aa",
+      "height": 10000,
+      "sats": 1000,
+      "count": 8,
+      "next": 3,
+      "funder": "wallet"
+    }
+  ],
+  "body": {
+    "note": "café au lait",
+    "plan": "line one\nline two",
+    "status": "in \u003croom 4\u003e \u0026 reachable"
+  },
+  "stores": [
+    {
+      "name": "plan",
+      "head": "467a998ed42127ea660cf34997436dd9baa4288a9d9af67b62372148d1cdffee",
+      "count": 1,
+      "carriers": [
+        {
+          "c": "467a998ed42127ea660cf34997436dd9baa4288a9d9af67b62372148d1cdffee",
+          "txid": "eeffcdd1482137627bf69a9d8a28a4bad96d439749f30c66ea2721d48e997a46",
+          "rawHex": "0100000001dd",
+          "fundingTxid": "5d1e2c7a9b0f38e4a6c1d2e3f405162738495a6b7c8d9eafb0c1d2e3f4051627",
+          "kind": 5
+        }
+      ]
+    },
+    {
+      "name": "photos",
+      "head": "4142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60",
+      "count": 2,
+      "carriers": [
+        {
+          "c": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20",
+          "txid": "201f1e1d1c1b1a191817161514131211100f0e0d0c0b0a090807060504030201",
+          "rawHex": "0100000001e1",
+          "fundingTxid": "5d1e2c7a9b0f38e4a6c1d2e3f405162738495a6b7c8d9eafb0c1d2e3f4051627",
+          "kind": 5
+        },
+        {
+          "c": "2122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40",
+          "txid": "403f3e3d3c3b3a393837363534333231302f2e2d2c2b2a292827262524232221",
+          "rawHex": "0100000001e2",
+          "fundingTxid": "5d1e2c7a9b0f38e4a6c1d2e3f405162738495a6b7c8d9eafb0c1d2e3f4051627",
+          "kind": 5
+        },
+        {
+          "c": "4142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60",
+          "txid": "605f5e5d5c5b5a595857565554535251504f4e4d4c4b4a494847464544434241",
+          "rawHex": "0100000001e3",
+          "fundingTxid": "5d1e2c7a9b0f38e4a6c1d2e3f405162738495a6b7c8d9eafb0c1d2e3f4051627",
+          "kind": 6
+        }
+      ]
+    }
+  ],
+  "updatedAt": "2026-09-27T12:34:56.123456789Z"
+}

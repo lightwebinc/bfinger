@@ -1,0 +1,40 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries and coverage
+*.test
+*.out
+coverage.*
+*.coverprofile
+profile.cov
+
+# Build outputs
+/build/
+/dist/
+# Anchored. An unanchored `bfinger` line also ignores cmd/bfinger/, which is
+# how a whole command directory goes missing from a first commit without
+# anything failing. Check with: git check-ignore -v cmd/bfinger/main.go
+/bfinger
+*.tar
+
+# Go workspace files
+go.work
+go.work.sum
+
+# Logs
+*.log
+
+# measurement harness binary
+/tools/mintprobe/mintprobe
+
+# The overlay host modules are a separate npm package; host/.gitignore
+# covers its own outputs. This is the backstop for a stray install at the
+# repository root.
+node_modules/
+
+# the wallet daemon binary
+/tools/walletd/walletd

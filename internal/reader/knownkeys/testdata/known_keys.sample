@@ -1,0 +1,7 @@
+# bfinger known_keys v1
+# One active record per address. @rotated-from is history and is never
+# matched for verification. @retired is terminal.
+
+alice@example.com secp256k1 02a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90 seq=7 first=2026-09-14T10:02:11Z last=2026-09-14T18:40:03Z fp=SHA256:o/ma3UeRhFI6x58etDGw5IqNJebvyHicEg1EYaC6Uvo
+@rotated-from alice@example.com secp256k1 03ff00112233445566778899aabbccddeeff00112233445566778899aabbccddee until_seq=6 at=2026-09-14T18:40:03Z fp=SHA256:K1QmpZIIwdM6gIswwUrceehW27htg7OwpNsOflGb3JM
+@retired bob@example.com secp256k1 02cc9a00112233445566778899aabbccddeeff00112233445566778899aabbccdd at=2026-09-12T08:00:00Z fp=SHA256:3eKHkA7POuVexes3wbjsJJZ9HeKkgoAnu6zbpV/EEeA

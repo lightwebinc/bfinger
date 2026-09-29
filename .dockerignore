@@ -1,0 +1,15 @@
+# The image is built from the Go module alone. Everything below is either a
+# build output or a separate toolchain's tree, and none of it reaches the
+# binary; leaving it out keeps the build context small and keeps a stale
+# local binary from ever being mistaken for the one the image built.
+.git
+/bfinger
+/dist
+/build
+host/node_modules
+host/dist
+host/bundle
+tools/walletd/walletd
+tools/mintprobe/mintprobe
+**/*.test
+**/*.out

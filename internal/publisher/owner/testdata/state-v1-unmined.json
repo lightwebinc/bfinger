@@ -1,0 +1,38 @@
+{
+  "acct": "user@example.com",
+  "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+  "seq": 1,
+  "kind": 1,
+  "tokenTxid": "8f2a4c6e8a0c2e4f6a8c0e2f4a6c8e0a2c4e6f8a0c2e4f6a8c0e2f4a6c8e0a2c",
+  "tokenRawHex": "0100000001bb",
+  "tokenBeefHex": "0100beef01bb",
+  "carrierTxid": "3b5d7f91a3c5e7092b4d6f81a3c5e7092b4d6f81a3c5e7092b4d6f81a3c5e709",
+  "carrierRawHex": "0100000001cc",
+  "witness": "a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0",
+  "funding": {
+    "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+    "txid": "5d1e2c7a9b0f38e4a6c1d2e3f405162738495a6b7c8d9eafb0c1d2e3f4051627",
+    "rawHex": "0100000001aa",
+    "beefHex": "0100beef01aa",
+    "sats": 1000,
+    "count": 8,
+    "next": 1,
+    "funder": "home"
+  },
+  "trees": [
+    {
+      "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+      "txid": "5d1e2c7a9b0f38e4a6c1d2e3f405162738495a6b7c8d9eafb0c1d2e3f4051627",
+      "rawHex": "0100000001aa",
+      "beefHex": "0100beef01aa",
+      "sats": 1000,
+      "count": 8,
+      "next": 1,
+      "funder": "home"
+    }
+  ],
+  "body": {
+    "status": "available"
+  },
+  "updatedAt": "2026-09-27T12:35:02.5Z"
+}

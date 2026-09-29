@@ -1,0 +1,12 @@
+{
+  "acct": "user@example.com",
+  "identityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+  "seq": 1,
+  "kind": 1,
+  "tokenTxid": "8f2a4c6e8a0c2e4f6a8c0e2f4a6c8e0a2c4e6f8a0c2e4f6a8c0e2f4a6c8e0a2c",
+  "tokenRawHex": "0100000001bb",
+  "carrierTxid": "3b5d7f91a3c5e7092b4d6f81a3c5e7092b4d6f81a3c5e7092b4d6f81a3c5e709",
+  "carrierRawHex": "0100000001cc",
+  "witness": "a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0",
+  "updatedAt": "2026-09-27T12:34:56Z"
+}
