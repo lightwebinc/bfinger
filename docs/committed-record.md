@@ -2,7 +2,7 @@
 
 The substrate for an application that keeps state in an overlay: a terse mined
 commitment, a record that lives in overlay storage, delivery by the multicast
-object plane, and unicast serving on lookup. Finger is its first instance.
+object plane ([BRC-148](https://github.com/bsv-blockchain/BRCs/blob/master/transactions/0148.md)), and unicast serving on lookup. Finger is its first instance.
 
 The design in one paragraph: the record is not stored in a locking script. The
 on-chain part is as terse as possible while still binding every byte the
@@ -516,7 +516,7 @@ Verified against the pinned versions:
   returns immediately when `feeModel === undefined`; no `lockTime`, `nSequence`
   or finality check anywhere in the verify helpers (`lockTime` reaches only the
   script interpreter). The Go SDK's SPV path reads no finality either.
-- `@lightwebinc/overlay` 2.3.1 `Engine.submit` calls
+- `@bsv/overlay` 2.3.1 `Engine.submit` calls
   `tx.verify(this.chainTracker)` with no fee model. Eviction of unproven
   outputs is opt-in: `evictUnprovenTransactions` is reached only from
   `maintainUnprovenTransactions`, which the host never calls;

@@ -2,7 +2,7 @@
 // currently claims about itself, with every claim checked rather than taken
 // on trust; and, for the address's owner, publishes and updates that claim.
 //
-// Exit codes follow the house oracle convention: 0 verified or done, 1
+// Exit codes: 0 verified or done, 1
 // refused or not found (the printed token says which), 2 usage or transport
 // error. It never exits 0 on an unverified answer.
 package main

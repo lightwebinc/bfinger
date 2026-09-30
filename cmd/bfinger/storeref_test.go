@@ -49,8 +49,8 @@ func TestStoreRefRootIsFrozen(t *testing.T) {
 // store.Head.
 //
 // This pins storeRef, not what the publish loop hands it: the loop's two
-// call sites are the producer core, and their arguments stay unpinned until
-// that core moves to the library with a parity gate of its own (E2.0a).
+// call sites are the shared publishing code, and their arguments stay
+// unpinned until that code moves to the library with a test of its own.
 func TestStoreRefHeadFollowsCount(t *testing.T) {
 	var a, b, manifest [32]byte
 	b[0], manifest[0] = 1, 0xee

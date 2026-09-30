@@ -84,8 +84,10 @@ jobs:
           sed "s#finger-host:latest#finger-host:${GITHUB_REF_NAME#v}#" ../deploy/compose.yaml > compose.yaml
           grep -q "finger-host:${GITHUB_REF_NAME#v}" compose.yaml
           sha256sum compose.yaml > compose.yaml.sha256
+          cp ../deploy/aws/finger-host.yaml finger-host.yaml
+          sha256sum finger-host.yaml > finger-host.yaml.sha256
           cat *.sha256 | sort -k2 > SHA256SUMS
-          rm -f *.tar.gz.sha256 compose.yaml.sha256
+          rm -f *.tar.gz.sha256 compose.yaml.sha256 finger-host.yaml.sha256
           ls -l
       - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
@@ -93,4 +95,5 @@ jobs:
           files: |
             dist/*.tar.gz
             dist/compose.yaml
+            dist/finger-host.yaml
             dist/SHA256SUMS

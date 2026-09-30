@@ -124,7 +124,7 @@ export class FingerTopicManager implements TopicManager {
     // markPreviousOutputSpent and notifyOutputSpent, lines 516-581), and a
     // retained coin is kept as consumed rather than deleted
     // (classifyPreviousCoins, lines 591-612). Read in
-    // @lightwebinc/overlay 2.3.1's dist/esm/src/Engine.js.
+    // @bsv/overlay 2.3.1's dist/esm/src/Engine.js.
     const nothingFingerShaped = tokenReason === undefined && carrierReason === 'not-pushdrop'
     if (nothingFingerShaped && previousCoins.length > 0) {
       this.host.metrics.inc('finger_admitted_total', { kind: 'spend' })

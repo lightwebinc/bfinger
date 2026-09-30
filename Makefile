@@ -1,7 +1,5 @@
-# GOWORK=off everywhere on purpose. In the shared workspace a member module
-# resolves to a sibling's local HEAD, so a go.mod skew stays invisible here and
-# surfaces in the Dockerfile's `go mod download`, which has no workspace.
-# Verify what ships, not what the workspace happens to have on disk.
+# GOWORK=off everywhere on purpose, so a local go.work never masks go.mod:
+# verify what ships, not what a workspace happens to have on disk.
 
 .PHONY: verify build test fmt-check vet deps-check licences licences-update host host-test host-docker dist clean docker-build docker-smoke
 

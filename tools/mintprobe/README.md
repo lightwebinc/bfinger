@@ -12,8 +12,8 @@ GOWORK=off go run . golden     # the CBOR goldens record/ is checked against
 What it prints, and what each proved (go-sdk v1.5.2):
 
 - `main.go`: six `pushdrop.Lock` mints across counterparty × forSelf at the
-  ratified triple; only `Anyone` + `forSelf=true` is both reader-derivable
-  and self-verifying.
+  chosen protocol and key triple; only `Anyone` + `forSelf=true` is both
+  reader-derivable and self-verifying.
 - `delegate.go`: a token minted by a delegate's wallet derives its locking
   key from the delegate, never the subject.
 - `newshape.go`: the committed-record shapes: state token 146 bytes

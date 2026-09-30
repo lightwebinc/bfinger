@@ -7,15 +7,16 @@ Manager always works). About USD 10 a month in us-east-2 as of 2026
 
 ```mermaid
 flowchart LR
-  R["readers and publishers"] -->|443| E["Elastic IP<br/>DNS name"]
+  R["readers and publishers"] -->|"HTTPS, port 443"| E["Elastic IP<br/>DNS name"]
   E --> I["t4g.micro<br/>caddy, finger-host, mysql"]
-  O["operator"] -->|22 from one address,<br/>or Session Manager| I
+  O["operator"] -->|"SSH, port 22, from one address,<br/>or Session Manager"| I
   I -->|headers| W["header source<br/>woc:main"]
 ```
 
 ## Deploy
 
 ```console
+$ curl -fsSLO https://github.com/lightwebinc/bfinger/releases/latest/download/finger-host.yaml
 $ aws cloudformation deploy --stack-name finger --capabilities CAPABILITY_IAM \
     --template-file finger-host.yaml --parameter-overrides \
     HostName=finger.example.com HostedZoneId=Z0123456789ABC \

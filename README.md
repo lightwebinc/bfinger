@@ -6,9 +6,9 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/lightwebinc/bfinger.svg)](https://pkg.go.dev/github.com/lightwebinc/bfinger)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-The UNIX `finger` command, rebuilt on Bitcoin. Ask what `user@domain`
-currently says about itself and get an answer that proves itself, instead
-of one you trust because of who handed it over.
+A Bitcoin-era descendant of the UNIX `finger` command. Ask what
+`user@domain` currently says about itself and get an answer that proves
+itself, instead of one you trust because of who handed it over.
 
 ```console
 $ bfinger -header-url woc:main alice@example.com
@@ -25,9 +25,9 @@ alice@example.com
 
 ```mermaid
 flowchart LR
-  R["bfinger (you)"] -->|1 who is alice?| D["example.com<br/>manifest + resolve"]
-  R -->|2 lookup| H["overlay hosts<br/>any replica"]
-  R -->|3 headers| S["header source<br/>proof of work checked"]
+  R["bfinger (you)"] -->|"1. who is alice?"| D["example.com<br/>manifest + resolve"]
+  R -->|"2. lookup"| H["overlay hosts<br/>any replica"]
+  R -->|"3. headers"| S["header source<br/>proof of work checked"]
   H -. record + Bitcoin proof .-> R
   O["owner"] -->|publish| H
   O -->|one small tx per update| B[("BSV blockchain")]
@@ -37,6 +37,13 @@ flowchart LR
 - **The domain names the key.** `example.com` answers which identity key is
   `alice`; your copy of bfinger pins that key on first contact and refuses a
   changed key unless the old one signed the rotation.
+- **The domain names its hosts, too.** The same `/manifest.json` lists the
+  overlay services that answer for the domain under `metanet.overlays`, as
+  [BRC-180](https://github.com/bsv-blockchain/BRCs/blob/master/overlays/0180.md)
+  specifies, so bfinger asks the lookup host the domain declares
+  (`ls_finger`) and never guesses a hostname. `bfinger domain-docs` writes
+  that entry, and `tm_finger` for submissions, for you. A declared host is
+  still only a claim: everything it serves is checked.
 - **Hosts are replicas, not authorities.** Any host can serve the record.
   One that edits it produces something that fails the check, so bfinger
   refuses it. Ask several with `-quorum 2`.
@@ -49,7 +56,9 @@ flowchart LR
   all of it passed. Exit status is `0` verified, `1` refused, `2` usage or
   transport failure; never `0` on an unverified answer.
 
-The argument in full: [docs/overview.md](docs/overview.md).
+The argument in full: [docs/overview.md](docs/overview.md). bfinger is the
+worked example in the pattern paper
+[_The bstack: publish once, prove everything, and let users ride free_](https://1bsv.net/papers/bstack-patterns.pdf).
 
 ## Install
 
@@ -86,9 +95,11 @@ Built and working end to end: the reader (lookups, `verify`, `-watch`,
 with a container image and a one-file host stack.
 
 Designed, not built yet: handle-certificate verification (BRC-52), a
-messagebox for payment notices, delegation, and host-side charging for
-lookups. [docs/overview.md](docs/overview.md#the-seams-left-open) lists each with the hook
-that makes it possible.
+messagebox for payment notices, delegation and the named stores it writes,
+host-side charging for lookups, content only a payer can read (BRC-369), and
+a reader-side spend check. [docs/architecture.md](docs/architecture.md#seams)
+lists them all, and [docs/overview.md](docs/overview.md#the-seams-left-open)
+explains the hook that makes each possible.
 
 ## Build
 

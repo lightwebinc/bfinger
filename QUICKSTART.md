@@ -7,8 +7,8 @@ for step 2, a small amount of BSV.
 
 ```mermaid
 flowchart LR
-  A["1 Read<br/>no setup"] --> B["2 Publish<br/>about 10,000 satoshis"]
-  B --> C["3 Be findable<br/>a domain and a host"]
+  A["1. Read<br/>no setup"] --> B["2. Publish<br/>about 10,000 satoshis"]
+  B --> C["3. Be findable<br/>a domain and a host"]
 ```
 
 ## 1. Read an address
@@ -70,9 +70,12 @@ imported 1 output(s), 10000 sat, mined at height 912430; wallet 1 output(s), 100
 
 bfinger checks the payment's proof against the headers before it counts it.
 
-**Point it at a host and publish.** Records are kept by overlay hosts.
-Use any host that carries the `tm_finger` topic, or your own (with none yet,
-do step 3 first and come back), and settle through a public ARC service:
+**Point it at a host and publish.** Records are kept by overlay hosts:
+servers that admit transactions for a topic and answer questions about
+them. bfinger's topic is `tm_finger`, and the host you publish to is your
+*facade*. Use any host that carries `tm_finger`, or your own (with none
+yet, do step 3 first and come back). The mined part goes to miners through
+a public ARC service (the transaction API miners run; `arcade:` names one):
 
 ```console
 $ alias bfinger='docker run --rm -it -v bfinger:/home/nonroot/.bfinger \
@@ -85,7 +88,8 @@ $ bfinger create alice@example.com -set status="hello, world" -yes
 $ bfinger status "back soon" -yes
 ```
 
-Nothing is sent without `-yes`; leave it off to see what would be built.
+Neither command sends anything without `-yes`; leave it off to see what
+would be built.
 `proofs = async` returns as soon as the network accepts the update; the
 proof is collected by your next update (or `bfinger publish -resume`).
 
@@ -108,7 +112,9 @@ $ HOST=finger.example.com docker compose up -d
 `-key` is the identity key `init` printed. The stack serves the resolve
 answer from `site/`; copy `site/manifest.json` to
 `https://example.com/manifest.json` (details in
-[docs/self-host.md](docs/self-host.md)) and check:
+[docs/self-host.md](docs/self-host.md)). If `example.com` already serves a
+`manifest.json`, put a copy of it in `site/` before running `domain-docs`:
+it keeps every other field and adds bfinger's. Then check:
 
 ```console
 $ bfinger alice@example.com -v

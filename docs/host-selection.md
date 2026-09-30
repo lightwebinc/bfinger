@@ -8,7 +8,7 @@ client and the answer) in `github.com/lightwebinc/bcommon`, and
 ## 1. Every host is a replica
 
 Hosts behind one name hold the same objects, delivered by the multicast plane
-or copied by GASP catch-up. Each admits objects on their own validity, keeps
+([BRC-148](https://github.com/bsv-blockchain/BRCs/blob/master/transactions/0148.md)) or copied by GASP catch-up. Each admits objects on their own validity, keeps
 its own index and answers from it; there is no leader. The reader verifies
 everything it is handed.
 

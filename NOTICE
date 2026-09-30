@@ -56,10 +56,11 @@ Interoperability
 bfinger speaks published standards and holds no private protocol. Any
 wallet that implements BRC-100 can hold the key it signs with; any
 overlay host that implements BRC-22 and BRC-24 can carry the objects and
-answer for them; any domain that publishes a BRC-169 manifest can publish
-the address mapping. Nothing here requires a particular network operator,
-and a record published through this tool remains readable by anything
-that can read the chain and reach a host that holds it.
+answer for them; any domain that publishes a BRC-180 manifest and a
+BRC-169 resolve endpoint can publish the address mapping. Nothing here
+requires a particular network operator, and a record published through
+this tool remains readable by anything that can read the chain and reach
+a host that holds it.
 
 =========================================================================
 Third-Party Software

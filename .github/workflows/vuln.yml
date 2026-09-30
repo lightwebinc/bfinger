@@ -5,10 +5,8 @@ name: Vuln scan
 
 on:
   schedule:
-    # Tuesdays and Fridays 04:00 UTC, tracking Renovate's Tue+Fri wave so a
-    # finding has a fix PR behind it the same afternoon rather than waiting out
-    # the rest of the week. CodeQL holds Mondays 03:00 — keep them apart so a
-    # failure is unambiguous about which scanner found what.
+    # Tuesdays and Fridays 04:00 UTC. CodeQL runs Mondays 03:00; keeping them
+    # apart makes a failure unambiguous about which scanner found what.
     - cron: "0 4 * * 2,5"
   workflow_dispatch:
 
@@ -29,7 +27,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           # Pinned to the BUILDER toolchain, not the go.mod floor. The floor is
-          # held at 1.26.2 fleet-wide on purpose; the shipped stdlib comes from
+          # held at 1.26.2 on purpose; the shipped stdlib comes from
           # the Dockerfile builder (golang:1.27-alpine). go-version-file: go.mod
           # reads the floor, so it exercised a stdlib we never ship -- which
           # surfaced in vuln.yml as 10 stdlib advisories fixed in 1.26.x.
