@@ -46,7 +46,16 @@ const recordCodec: bcommon.PayloadCodec<CommittedRecord> = {
       throw err
     }
   },
-  validate: validateRecord,
+  validate(r: CommittedRecord): void {
+    validateRecord(r)
+    // A key the record names is held to its one encoding, as the Go reader
+    // holds it: the next record must carry a successor byte for byte, and
+    // an identity is what the index and the pins are keyed by.
+    if (bcommon.strictPublicKey(r.identityKey) === undefined) throw new RecordError('field', 'identityKey is not a canonical key')
+    if (r.successor !== undefined && bcommon.strictPublicKey(r.successor) === undefined) {
+      throw new RecordError('field', 'successor is not a canonical key')
+    }
+  },
 }
 
 /** The identity's record key, from the identity key the record carries. */

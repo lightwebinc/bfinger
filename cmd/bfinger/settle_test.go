@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bsv-blockchain/go-sdk/chainhash"
 	"github.com/bsv-blockchain/go-sdk/script"
 	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/lightwebinc/bcommon/publish"
@@ -86,6 +87,27 @@ func fundScriptForTest(t *testing.T) *script.Script {
 		t.Fatal(err)
 	}
 	return s
+}
+
+// spendsMadeUp gives tx one input spending a made-up outpoint, with no
+// source transaction, for a transaction that carries its own proof. Every
+// BEEF bfinger reads from the network passes a guard that refuses a
+// transaction of no inputs, which no real transaction is.
+func spendsMadeUp(tx *transaction.Transaction) {
+	src := chainhash.Hash{0x01}
+	tx.AddInput(&transaction.TransactionInput{SourceTXID: &src, UnlockingScript: &script.Script{}, SequenceNumber: transaction.MaxTxInSequenceNum})
+}
+
+// spendsProvenParent gives tx one input from a proven parent, for an
+// unproven transaction whose BEEF must carry its ancestry.
+func spendsProvenParent(tx *transaction.Transaction) {
+	parent := transaction.NewTransaction()
+	spendsMadeUp(parent)
+	parent.AddOutput(&transaction.TransactionOutput{Satoshis: 1, LockingScript: script.NewFromBytes([]byte{script.OpTRUE})})
+	isTxid := true
+	parent.MerklePath = transaction.NewMerklePath(1, [][]*transaction.PathElement{{{Offset: 0, Hash: parent.TxID(), Txid: &isTxid}}})
+	tx.AddInput(&transaction.TransactionInput{SourceTXID: parent.TxID(), SourceTransaction: parent, UnlockingScript: &script.Script{},
+		SequenceNumber: transaction.MaxTxInSequenceNum})
 }
 
 // A home that never published still collects the proof of change it holds

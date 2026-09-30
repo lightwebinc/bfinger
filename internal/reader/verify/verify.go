@@ -30,6 +30,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/transaction/chaintracker"
 
 	bccarrier "github.com/lightwebinc/bcommon/carrier"
+	"github.com/lightwebinc/bcommon/guard"
 	bcverify "github.com/lightwebinc/bcommon/verify"
 	"github.com/lightwebinc/bfinger/internal/protocol/carrier"
 	"github.com/lightwebinc/bfinger/internal/protocol/record"
@@ -134,7 +135,7 @@ func Verify(ctx context.Context, items []Item, opt Options) *Result {
 	// 2. Parse every item and classify the output it names.
 	var tokens, carriers []*parsed
 	for i, it := range items {
-		beef, tx, txid, err := transaction.ParseBeef(it.Beef)
+		beef, tx, txid, err := guard.ParseBEEF(it.Beef, guard.DefaultBound)
 		if err != nil || tx == nil {
 			return r.refuse(RefusedDecode, fmt.Sprintf("output %d: BEEF does not parse: %v", i, err))
 		}
@@ -235,11 +236,18 @@ func Verify(ctx context.Context, items []Item, opt Options) *Result {
 	r.step("carrier", true, cur.txid.String())
 
 	// 5. Both derivations from the record's identity key, both signatures.
-	identity, err := ec.PublicKeyFromBytes(r.Record.IdentityKey[:])
+	identity, err := guard.ParsePubKey(r.Record.IdentityKey[:])
 	if err != nil {
 		return r.refuse(RefusedDecode, "identity key: "+err.Error())
 	}
 	r.Identity = identity
+	// A rotation's successor is a key the next record must carry byte for
+	// byte, so it is held to the same one encoding as the identity.
+	if r.Record.Successor != nil {
+		if _, err := guard.ParsePubKey(r.Record.Successor[:]); err != nil {
+			return r.refuse(RefusedDecode, "successor key: "+err.Error())
+		}
+	}
 	want, err := token.ExpectedLockingKey(identity, token.KeyIDProfile)
 	if err != nil {
 		return r.refuse(RefusedKeyDerive, err.Error())

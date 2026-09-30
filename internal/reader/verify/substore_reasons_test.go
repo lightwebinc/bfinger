@@ -257,19 +257,19 @@ func storeCases() []storeCase {
 				s.items = []verify.Item{{Beef: []byte{1, 2, 3}}}
 				return s
 			},
-			code: "REFUSED-DECODE", reason: "{what}: BEEF does not parse: invalid-version",
+			code: "REFUSED-DECODE", reason: "{what}: BEEF does not parse: guard: BEEF refused: ends mid-structure",
 		},
 		{
-			// A BEEF V1 of no BUMPs and no transactions parses without an
-			// error and without a transaction, so the reason ends in the
-			// formatted nil error. Current behaviour, pinned as it is.
+			// A BEEF V1 of no BUMPs and no transactions, which the SDK parses
+			// without an error and without a transaction, is refused by the
+			// guard before the SDK sees it.
 			name: "BEEF holds no transaction",
 			build: func(f *fixture, kind uint8) storeScene {
 				s := f.served(f.memberTx(f.w1, f.id1, kind, 0x83, 0))
 				s.items = []verify.Item{{Beef: []byte{0x01, 0x00, 0xbe, 0xef, 0x00, 0x00}}}
 				return s
 			},
-			code: "REFUSED-DECODE", reason: "{what}: BEEF does not parse: <nil>",
+			code: "REFUSED-DECODE", reason: "{what}: BEEF does not parse: guard: BEEF refused: no transactions",
 		},
 		{
 			name: "not a carrier: no record output",
@@ -368,7 +368,7 @@ func storeCases() []storeCase {
 				tx.AddOutput(&transaction.TransactionOutput{Satoshis: 1, LockingScript: lock})
 				return f.served(tx)
 			},
-			code: "REFUSED-DECODE", reason: "{what}: carrier: not a carrier: no inputs",
+			code: "REFUSED-DECODE", reason: "{what}: BEEF does not parse: guard: BEEF refused: transaction 0: no inputs",
 		},
 		{
 			// The record names id1 and the lock derives from w2's key.

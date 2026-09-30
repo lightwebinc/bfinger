@@ -12,10 +12,10 @@ import (
 	"github.com/lightwebinc/bfinger/internal/reader/verify"
 )
 
-// testKey is a well-formed compressed key for argument-order tests only: the
-// pin command checks the prefix and the length, never the curve, so no real
-// point is needed here.
-const testKey = "020102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20"
+// testKey is a key for argument-order tests: the golden vector's published
+// test key. It must be a real point in its one encoding, since the pin
+// command refuses any other.
+const testKey = "0324653eac434488002cc06bbfb7f10fe18991e35f9fe4302dbea6d2353dc0ab1c"
 
 // tempFile stands in for stdout or stderr, which the command functions take
 // as *os.File. It returns the handle and a reader for what was written.
@@ -133,6 +133,40 @@ func TestKeysTrustAcceptsTheDocumentedFlagOrder(t *testing.T) {
 			}
 			if r.KeyHex != testKey {
 				t.Errorf("pinned key = %s, want %s", r.KeyHex, testKey)
+			}
+		})
+	}
+}
+
+// A key is pinned only in its one encoding: the aliased 02 || p+1, an
+// uncompressed key and an off-curve x are refused as usage and pin nothing,
+// and upper-case hex is pinned as the lower-case spelling.
+func TestKeysTrustPinsOnlyTheCanonicalKey(t *testing.T) {
+	for _, c := range []struct {
+		name, key, want string
+	}{
+		{"aliased", "02fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc30", ""},
+		{"off curve", "02" + strings.Repeat("00", 31) + "05", ""},
+		{"upper case", strings.ToUpper(testKey), testKey},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			g := &global{cfg: config.Config{KnownKeys: filepath.Join(t.TempDir(), "known_keys")}}
+			stdout, _ := tempFile(t)
+			stderr, _ := tempFile(t)
+			err := cmdKeys(context.Background(), g, []string{"trust", "-key", c.key, "alice@example.com"}, stdout, stderr)
+			recs, lerr := knownkeys.Load(g.cfg.KnownKeys)
+			if lerr != nil {
+				t.Fatal(lerr)
+			}
+			r, ok := knownkeys.ActiveFor(recs, "alice@example.com")
+			if c.want == "" {
+				if err == nil || ok {
+					t.Fatalf("keys trust -key %s: err %v, pinned %v", c.key, err, ok)
+				}
+				return
+			}
+			if err != nil || !ok || r.KeyHex != c.want {
+				t.Fatalf("keys trust -key %s: err %v, pinned %q, want %q", c.key, err, r.KeyHex, c.want)
 			}
 		})
 	}

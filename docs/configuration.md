@@ -175,7 +175,7 @@ Flags go on either side of the address. `list` and `verify` take none; `-h` or
 
 | Subcommand | Flag | Default | Notes |
 | --- | --- | --- | --- |
-| `trust <acct>` | `-key HEX` | none, required | a 33-byte compressed key, `02` or `03` |
+| `trust <acct>` | `-key HEX` | none, required | a 33-byte compressed key, `02` or `03`, a point on the curve in its one encoding |
 | `trust <acct>` | `-fingerprint SHA256:...` | none | refuse unless the key hashes to this |
 | `trust <acct>` | `-force` | `false` | replace an existing or retired pin |
 | `forget <acct>` | `-all` | `false` | remove the `@rotated-from` history too |

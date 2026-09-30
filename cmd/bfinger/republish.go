@@ -97,11 +97,11 @@ func cmdPublish(ctx context.Context, g *global, args []string, stdout, stderr *o
 	if err != nil {
 		return fmt.Errorf("state token: %w", err)
 	}
-	cb, err := k.AtomicBEEF(false)
+	cb, err := funding.BEEF(k)
 	if err != nil {
 		return fmt.Errorf("carrier BEEF: %w", err)
 	}
-	tb, err := tok.AtomicBEEF(false)
+	tb, err := funding.BEEF(tok)
 	if err != nil {
 		return fmt.Errorf("token BEEF: %w", err)
 	}
@@ -148,7 +148,7 @@ func cmdPublish(ctx context.Context, g *global, args []string, stdout, stderr *o
 					in.SourceTransaction = parent
 				}
 			}
-			sb, err := sk.AtomicBEEF(false)
+			sb, err := funding.BEEF(sk)
 			if err != nil {
 				return fmt.Errorf("store %q carrier %s: %w", sub.Name, sc.Txid, err)
 			}

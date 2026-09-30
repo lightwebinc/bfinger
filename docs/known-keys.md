@@ -27,10 +27,11 @@ Recognised `key=value` fields: `seq`, `until_seq` (unsigned decimal),
 `first`, `last`, `at` (RFC 3339), `fp` (fingerprint).
 
 The key is 33 bytes of hex whose first byte is `02` or `03`, the compressed
-form. Both are checked on read. The point is not checked against the curve
-here: a key that is not on it can never match one derived from a record, so
-it fails at the comparison with a message about the key rather than about the
-file.
+form, in its one encoding: an `x` below the field prime that names a point on
+the curve. All of it is checked on read, so a file holding any other key is
+refused, naming the line. A key whose `x` is at or above the prime is a second
+spelling of another key, and pins are compared as strings. A new pin is
+written in lower-case hex.
 
 ## Rules that are not style
 

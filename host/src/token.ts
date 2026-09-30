@@ -8,7 +8,7 @@
  * a carrier transaction and never reaches the chain.
  */
 import { PushDrop, type LockingScript, type PublicKey, type Script } from '@bsv/sdk'
-import { verifyFieldSignature } from '@lightwebinc/bcommon'
+import { decodeStrictPushDrop, verifyFieldSignature } from '@lightwebinc/bcommon'
 
 // Lock's field signature is checked by the library; it stays exported here
 // so the token module's export surface is unchanged.
@@ -30,7 +30,7 @@ export interface Token {
  * `not-pushdrop` did not decode as a lock-before PushDrop at all;
  * `not-token` is a PushDrop with some other field count (a carrier has two);
  * `bad-tag` has three fields but the wrong tag or a commitment that is not
- * 32 bytes.
+ * 32 bytes, or is a token written other than the one way Lock writes it.
  */
 export type TokenInspection = { kind: 'token'; token: Token } | { kind: 'not-pushdrop' | 'not-token' | 'bad-tag' }
 
@@ -54,9 +54,14 @@ export function inspectToken(script: Script): TokenInspection {
   const [tag, c, sig] = decoded.fields
   if (tag === undefined || c === undefined || sig === undefined) return { kind: 'not-token' }
   if (!sameBytes(tag, Tag) || c.length !== 32) return { kind: 'bad-tag' }
+  // Only once the script is known to be a token: one written another way (a
+  // wider push, loose drops, a second encoding of its key) is refused, as the
+  // Go token.Decode refuses it, and never read as somebody else's output.
+  const strict = decodeStrictPushDrop(script)
+  if (strict === undefined) return { kind: 'bad-tag' }
   return {
     kind: 'token',
-    token: { c: [...c], lockingKey: decoded.lockingPublicKey, valid: verifyFieldSignature(decoded.lockingPublicKey, [...tag, ...c], sig) },
+    token: { c: [...c], lockingKey: strict.lockingPublicKey, valid: verifyFieldSignature(strict.lockingPublicKey, [...tag, ...c], sig) },
   }
 }
 

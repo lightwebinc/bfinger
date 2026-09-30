@@ -58,6 +58,7 @@ func (w *actionWallet) CreateAction(_ context.Context, args wallet.CreateActionA
 		tx.AddOutput(&transaction.TransactionOutput{Satoshis: o.Satoshis, LockingScript: script.NewFromBytes(o.LockingScript)})
 	}
 	if len(args.Inputs) == 0 {
+		spendsProvenParent(tx)
 		b, err := tx.AtomicBEEF(false)
 		if err != nil {
 			return nil, err

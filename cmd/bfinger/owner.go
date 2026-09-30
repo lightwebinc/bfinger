@@ -19,6 +19,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/transaction"
 
 	"github.com/lightwebinc/bcommon/funding"
+	"github.com/lightwebinc/bcommon/guard"
 	"github.com/lightwebinc/bcommon/nodeapi"
 	"github.com/lightwebinc/bcommon/producer"
 	"github.com/lightwebinc/bcommon/publish"
@@ -574,7 +575,7 @@ func (s *session) sweepFor(ctx context.Context, tr owner.Funding, tf *transition
 		}
 		s.payer().Change(sweep, 0, nil)
 	}
-	beef, err := sweep.AtomicBEEF(false)
+	beef, err := funding.BEEF(sweep)
 	if err != nil {
 		return nil, false, err
 	}
@@ -594,7 +595,7 @@ func (s *session) postTree(ctx context.Context, tr owner.Funding) error {
 	if err != nil {
 		return fmt.Errorf("tree %s: %w", tr.Txid, err)
 	}
-	beef, err := tree.AtomicBEEF(false)
+	beef, err := funding.BEEF(tree)
 	if err != nil {
 		return err
 	}
@@ -1083,11 +1084,11 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 	// The object leg: sub-records, then the carrier, then the token, so
 	// each admission finds what it refers to, though the host tolerates any
 	// order.
-	cb, err := k.AtomicBEEF(false)
+	cb, err := funding.BEEF(k)
 	if err != nil {
 		return err
 	}
-	tb, err := tok.AtomicBEEF(false)
+	tb, err := funding.BEEF(tok)
 	if err != nil {
 		return err
 	}
@@ -1099,7 +1100,7 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 	}
 	objects := make([]object, 0, len(subs)+2)
 	for _, m := range subs {
-		sb, err := m.tx.AtomicBEEF(false)
+		sb, err := funding.BEEF(m.tx)
 		if err != nil {
 			return err
 		}
@@ -1618,8 +1619,8 @@ func cmdRotate(ctx context.Context, g *global, args []string, stdout, stderr *os
 	var succ [33]byte
 	succPath := ""
 	if succHex != "" {
-		pub, err := ec.PublicKeyFromString(succHex)
-		if err != nil || len(pub.Compressed()) != 33 {
+		pub, err := guard.ParsePubKeyHex(succHex)
+		if err != nil {
 			return usage("rotate: -successor wants a compressed identity key, 66 hex")
 		}
 		if succHex == keyHex(s.signer) {
@@ -1890,7 +1891,7 @@ func cmdKill(ctx context.Context, g *global, args []string, stdout, stderr *os.F
 		// Hosts learn of the kill from the sweep itself, mined or not, so it
 		// is posted before any wait: a slow block must not leave the records
 		// standing.
-		sb, err := sweep.AtomicBEEF(false)
+		sb, err := funding.BEEF(sweep)
 		if err != nil {
 			return err
 		}
@@ -1915,7 +1916,7 @@ func cmdKill(ctx context.Context, g *global, args []string, stdout, stderr *os.F
 				}
 				// Hosts hold the unmined copy posted above; the proven one
 				// replaces it, and is what a peer catching up is served.
-				if pb, perr := sweep.AtomicBEEF(false); perr == nil {
+				if pb, perr := funding.BEEF(sweep); perr == nil {
 					if _, perr = s.l.facade.Submit(ctx, g.cfg.Topic, pb); perr == nil {
 						delete(s.st.Sweeps, tr.Txid)
 					}

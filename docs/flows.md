@@ -425,7 +425,7 @@ flowchart TD
   PARSE -->|"no"| OTH["reason other"]
   PARSE -->|"yes"| SCAN["each output"]
   SCAN --> TQ{"a three field PushDrop with the tag 62 66 01 and a 32 byte C"}
-  TQ -->|"the tag or the size is wrong"| BT["bad-tag"]
+  TQ -->|"the tag or the size is wrong, or not the minimal encoding"| BT["bad-tag"]
   TQ -->|"the field signature fails"| BS["bad-sig"]
   TQ -->|"it verifies"| AT["admit, token"]
   SCAN --> FQ{"one field PushDrop, tag 62 66 02, no signature"}

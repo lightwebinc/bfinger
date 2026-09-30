@@ -23,6 +23,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/wallet"
 
 	bcbwallet "github.com/lightwebinc/bcommon/bwallet"
+	"github.com/lightwebinc/bcommon/guard"
 	"github.com/lightwebinc/bcommon/nodeapi"
 )
 
@@ -291,7 +292,7 @@ func TestWalletTextsAreFrozen(t *testing.T) {
 	// BRC-29: a recipient key that is not a key, a derivation owned by some
 	// other identity, and a derived input the wallet refuses to sign.
 	g := newWallet(t).Signer()
-	_, keyErr := ec.PublicKeyFromString("not a key")
+	_, keyErr := guard.ParsePubKeyHex("not a key")
 	if keyErr == nil {
 		t.Fatal("\"not a key\" parsed as a key")
 	}

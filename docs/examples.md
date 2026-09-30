@@ -226,8 +226,9 @@ $ bfinger 0324653eac434488002cc06bbfb7f10fe18991e35f9fe4302dbea6d2353dc0ab1c
 bfinger: looking up an identity by key needs -host (there is no domain to consult)
 ```
 
-Any 66 hex characters starting `02` or `03` are a key; one off the curve is
-refused with `not a valid compressed key`. The trace starts `identity given
+Any 66 hex characters starting `02` or `03` that spell a point in its one
+encoding are a key; one off the curve, or with `x` at or above the field
+prime, is refused with `not a valid compressed key`. The trace starts `identity given
 as a key; no name resolution`. The pin is keyed by the hex, apart from the
 address's, and the check that domain and record name one identity is skipped.
 
@@ -388,7 +389,9 @@ bfinger: keys trust: -key is required; run `bfinger alice@example.com` to pin on
 
 `-fingerprint SHA256:…` refuses a key that does not match it. The `02`/`03`
 prefix is checked as well as the length, because half a pasted uncompressed
-key fingerprints as cleanly as a real one. A retired address counts as
+key fingerprints as cleanly as a real one, and so is the point: a key off the
+curve, or a second spelling of one on it, is refused the same way. The pin is
+written in lower-case hex whatever case was typed. A retired address counts as
 pinned; `-force` removes the retirement record and pins in its place. Use it
 when the owner has come back with a new key by a channel you trust, not to
 get past an unexplained refusal.

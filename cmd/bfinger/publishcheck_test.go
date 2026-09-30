@@ -16,8 +16,10 @@ import (
 // the host answers with the carrier (or token) it holds, matched by txid.
 func TestConfirmHeldMatchesTheTxid(t *testing.T) {
 	held := transaction.NewTransaction()
+	spendsProvenParent(held)
 	held.AddOutput(&transaction.TransactionOutput{Satoshis: 1, LockingScript: fundScriptForTest(t)})
 	other := transaction.NewTransaction()
+	spendsProvenParent(other)
 	other.AddOutput(&transaction.TransactionOutput{Satoshis: 2, LockingScript: fundScriptForTest(t)})
 	beef, err := held.BEEF()
 	if err != nil {

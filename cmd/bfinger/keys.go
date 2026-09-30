@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/lightwebinc/bcommon/guard"
 	"github.com/lightwebinc/bcommon/resolve"
 	"github.com/lightwebinc/bfinger/internal/reader/knownkeys"
 )
@@ -79,7 +80,10 @@ func cmdKeys(ctx context.Context, g *global, args []string, stdout, stderr *os.F
 			return usage("keys trust: -key is required; run `bfinger " + acct.String() + "` to pin on first contact instead")
 		}
 		kb, err := hex.DecodeString(*key)
-		if err != nil || len(kb) != 33 || (kb[0] != 0x02 && kb[0] != 0x03) {
+		if err == nil {
+			_, err = guard.ParsePubKey(kb)
+		}
+		if err != nil {
 			return usage("keys trust: -key must be a 33-byte compressed key in hex")
 		}
 		have := knownkeys.Fingerprint(kb)
@@ -102,7 +106,9 @@ func cmdKeys(ctx context.Context, g *global, args []string, stdout, stderr *os.F
 			}
 			recs = knownkeys.Forget(recs, acct.String(), false)
 		}
-		recs, err = knownkeys.Pin(recs, acct.String(), *key, 0, have, time.Now())
+		// The pin is written in the key's one spelling, lower-case hex, which
+		// is the only one the pin store accepts.
+		recs, err = knownkeys.Pin(recs, acct.String(), hex.EncodeToString(kb), 0, have, time.Now())
 		if err != nil {
 			return err
 		}

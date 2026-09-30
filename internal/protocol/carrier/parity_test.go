@@ -153,7 +153,7 @@ func TestLibraryReadsGolden(t *testing.T) {
 		t.Fatal(err)
 	}
 	err = c.Validate(p, offCurve)
-	if !errors.Is(err, record.ErrField) || err.Error() != "record: field has the wrong shape: identity key: invalid square root" {
+	if !errors.Is(err, record.ErrField) || err.Error() != "record: field has the wrong shape: identity key: guard: public key refused: invalid square root" {
 		t.Fatalf("off-curve identity: %v", err)
 	}
 }

@@ -15,7 +15,7 @@ every other path is under `internal/`.
 | Step | What is checked | Where |
 | --- | --- | --- |
 | 1 | The name resolves to an identity key and a host (BRC-169, BRC-180) | `bcommon/resolve/`, `bcommon/hostset/` |
-| 2 | The host's answer is an `output-list`, identical at every host asked | `bcommon/lookup/`, `reader/lookup/`, `cmd/bfinger/reader.go` |
+| 2 | The host's answer is an `output-list`, identical at every host asked; each BEEF walked by the guard before the SDK parses it | `bcommon/lookup/`, `bcommon/guard/`, `reader/lookup/`, `reader/verify/`, `cmd/bfinger/reader.go` |
 | 3 | The token's merkle proof against the reader's header source, each header's proof of work checked when the source serves headers | `bcommon/headers/`, `bcommon/verify/`, `reader/verify/` |
 | 4 | The carrier proven through its funding parent, its txid equal to the token's `C` | `bcommon/verify/`, `bcommon/carrier/`, `protocol/carrier/`, `reader/verify/` |
 | 5 | Both key derivations, and both field signatures under them | `bcommon/pushdrop/`, `protocol/token/`, `protocol/carrier/`, `reader/verify/` |
@@ -43,7 +43,9 @@ An identity key is pinned on first contact; without that, a host that swaps
 the key it answers with impersonates anyone and every signature still
 verifies. The store enforces:
 
-- A pin is a compressed key (`02` or `03`, 33 bytes); an uncompressed key
+- A pin is a compressed key (`02` or `03`, 33 bytes) in its one encoding,
+  an `x` below the field prime on the curve, written in lower-case hex; an
+  uncompressed key, or a compressed one whose `x` is at or above the prime,
   would pin a second spelling of the same point.
 - One address has at most one `Active` pin. Retired and superseded pins are
   kept, so a rotation stays auditable.
@@ -122,6 +124,7 @@ The bcommon packages bfinger imports:
 | `bcommon/resolve` | Name to identity key through the BRC-180 manifest and BRC-169 resolve endpoint |
 | `bcommon/knownkeys` | The pin file's grammar and the pin store's rules |
 | `bcommon/verify` | The refusal vocabulary, the SPV verdict against the reader's headers, and `VerifyCarrier` for store members |
+| `bcommon/guard` | The walk every BEEF, raw transaction and BUMP from the network passes before go-sdk parses it, bounding each declared count by the bytes present; and `ParsePubKey`, which accepts a key from the wire only in its one encoding |
 | `bcommon/goldentest` | Vector-free test helpers: a fixed key, parsing that fails the test, a stub chain tracker |
 
 ## Dependencies
@@ -137,7 +140,9 @@ version selection would otherwise let a bcommon tag move it.
 The pin is a security decision: below v1.5.0 the SDK sizes a slice from an
 attacker-declared count while parsing a merkle path, so a thirteen byte input
 ends the process with an unrecoverable out-of-memory. No dependency bot may
-move it.
+move it. Every BEEF, raw transaction and BUMP bfinger reads from the network
+also passes `bcommon/guard` first, so that bound no longer rests on the pin
+alone.
 
 The host modules have two runtime dependencies: `@bsv/sdk` at exactly 2.7.1,
 which the overlay host provides, and `@lightwebinc/bcommon` at the tag go.mod

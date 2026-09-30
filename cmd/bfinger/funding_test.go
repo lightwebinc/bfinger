@@ -298,6 +298,7 @@ func (w *treeWallet) GetPublicKey(ctx context.Context, args wallet.GetPublicKeyA
 
 func (w *treeWallet) CreateAction(_ context.Context, args wallet.CreateActionArgs, _ string) (*wallet.CreateActionResult, error) {
 	tx := transaction.NewTransaction()
+	spendsProvenParent(tx)
 	for _, o := range args.Outputs[:min(w.keep, len(args.Outputs))] {
 		tx.AddOutput(&transaction.TransactionOutput{Satoshis: o.Satoshis, LockingScript: script.NewFromBytes(o.LockingScript)})
 	}

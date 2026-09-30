@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/lightwebinc/bcommon/guard"
 	"github.com/lightwebinc/bfinger/internal/reader/lookup"
 )
 
@@ -76,7 +77,7 @@ func cmdDomainDocs(ctx context.Context, g *global, args []string, stdout, stderr
 		}
 		key = hex.EncodeToString(sg.IdentityKey().Compressed())
 	}
-	if kb, err := hex.DecodeString(key); err != nil || len(kb) != 33 || (kb[0] != 0x02 && kb[0] != 0x03) {
+	if _, err := guard.ParsePubKeyHex(key); err != nil {
 		return usage("domain-docs: -key must be a compressed public key, 66 hex characters starting 02 or 03")
 	}
 

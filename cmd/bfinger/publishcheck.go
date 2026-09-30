@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/bsv-blockchain/go-sdk/transaction"
+	"github.com/lightwebinc/bcommon/guard"
 	"github.com/lightwebinc/bcommon/hostset"
 	"github.com/lightwebinc/bcommon/resolve"
 	"github.com/lightwebinc/bfinger/internal/protocol/carrier"
@@ -50,7 +51,7 @@ func (s *session) confirmHeld(ctx context.Context, want *transaction.Transaction
 	txid := want.TxID().String()
 	for _, a := range answers {
 		for _, o := range a.Answer.Outputs {
-			if tx, err := transaction.NewTransactionFromBEEF(o.Beef); err == nil && tx.TxID().String() == txid {
+			if _, tx, _, err := guard.ParseBEEF(o.Beef, guard.DefaultBound); err == nil && tx != nil && tx.TxID().String() == txid {
 				return true, base, nil
 			}
 		}

@@ -19,6 +19,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/transaction"
 
 	"github.com/lightwebinc/bcommon/funding"
+	"github.com/lightwebinc/bcommon/guard"
 	"github.com/lightwebinc/bcommon/resolve"
 	"github.com/lightwebinc/bfinger/internal/protocol/mint"
 	"github.com/lightwebinc/bfinger/internal/publisher/bwallet"
@@ -60,7 +61,7 @@ func randomToken() string {
 // resolveRecipient turns an address or a key into an identity key.
 func resolveRecipient(ctx context.Context, g *global, arg string) (*ec.PublicKey, string, error) {
 	if kb, err := hex.DecodeString(arg); err == nil && len(kb) == 33 {
-		pub, err := ec.PublicKeyFromBytes(kb)
+		pub, err := guard.ParsePubKey(kb)
 		if err != nil {
 			return nil, "", usage("not a valid compressed key")
 		}
@@ -79,9 +80,9 @@ func resolveRecipient(ctx context.Context, g *global, arg string) (*ec.PublicKey
 	if err != nil {
 		return nil, "", fmt.Errorf("resolve %s: %w", acct, err)
 	}
-	pub, err := ec.PublicKeyFromBytes(h.IdentityKey[:])
+	pub, err := guard.ParsePubKey(h.IdentityKey[:])
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("resolve %s: identity key: %w", acct, err)
 	}
 	return pub, acct.String(), nil
 }
@@ -157,7 +158,7 @@ func cmdPay(ctx context.Context, g *global, args []string, stdout, stderr *os.Fi
 	// carries the payment's ancestry, and receive fetches the proof by txid
 	// once the payment has a block. It is rewritten with the proof below.
 	notice := func(height uint32) (string, error) {
-		beef, err := tx.AtomicBEEF(false)
+		beef, err := funding.BEEF(tx)
 		if err != nil {
 			return "", err
 		}
@@ -250,7 +251,10 @@ func cmdReceive(ctx context.Context, g *global, args []string, stdout, stderr *o
 	if err != nil {
 		return fmt.Errorf("notice beef: %w", err)
 	}
-	_, tx, txid, err := transaction.ParseBeef(beef)
+	if _, err := guard.ParsePubKeyHex(n.SenderKeyHex); err != nil {
+		return &exitError{1, fmt.Sprintf("notice sender: %v", err)}
+	}
+	_, tx, txid, err := guard.ParseBEEF(beef, guard.DefaultBound)
 	if err != nil || tx == nil {
 		return fmt.Errorf("notice beef does not parse: %v", err)
 	}
@@ -266,7 +270,7 @@ func cmdReceive(ctx context.Context, g *global, args []string, stdout, stderr *o
 			return &exitError{1, "the payment has no proof yet: " + err.Error()}
 		}
 		tx = mined
-		if beef, err = tx.AtomicBEEF(false); err != nil {
+		if beef, err = funding.BEEF(tx); err != nil {
 			return err
 		}
 	}

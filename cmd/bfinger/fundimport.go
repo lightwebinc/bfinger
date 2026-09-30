@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/chainhash"
 	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/lightwebinc/bcommon/funding"
+	"github.com/lightwebinc/bcommon/guard"
 	"github.com/lightwebinc/bcommon/nodeapi"
 	"github.com/lightwebinc/bfinger/internal/publisher/bwallet"
 )
@@ -74,7 +76,18 @@ func wocBEEF(ctx context.Context, network, txid string, timeout time.Duration) (
 	case len(body) > maxImportBEEF:
 		return nil, fmt.Errorf("WhatsOnChain: %s: answer over %d bytes", txid, maxImportBEEF)
 	}
-	return transaction.NewTransactionFromBEEFHex(string(bytes.TrimSpace(body)))
+	beef, err := hex.DecodeString(string(bytes.TrimSpace(body)))
+	if err != nil {
+		return nil, fmt.Errorf("WhatsOnChain: %s: BEEF is not hex: %w", txid, err)
+	}
+	_, tx, _, err := guard.ParseBEEF(beef, guard.DefaultBound)
+	if err != nil {
+		return nil, fmt.Errorf("WhatsOnChain: %s: BEEF does not parse: %w", txid, err)
+	}
+	if tx == nil {
+		return nil, fmt.Errorf("WhatsOnChain: %s: BEEF names no transaction", txid)
+	}
+	return tx, nil
 }
 
 // fetchMined fetches a mined transaction with its proof, from the node's
@@ -98,7 +111,7 @@ func fetchMined(ctx context.Context, g *global, txid string) (*transaction.Trans
 		if err != nil {
 			return nil, fmt.Errorf("node: %s: %w", txid, err)
 		}
-		if tx, err = transaction.NewTransactionFromBytes(raw); err != nil {
+		if tx, err = guard.ParseTransaction(raw, guard.DefaultBound); err != nil {
 			return nil, err
 		}
 		if tx.MerklePath, _, err = asset.Proof(ctx, txid); err != nil {

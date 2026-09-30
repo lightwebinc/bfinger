@@ -227,7 +227,7 @@ func TestInvalidRecordThatIsNotTheCommitment(t *testing.T) {
 // curve. record.Decode checks the prefix only and record.Validate not at
 // all, so carrier.Mint makes this carrier, and carrier.Validate is the
 // first to parse the key, AFTER the finality checks. The identity text is
-// the record's ErrField wrapped around the SDK's parse error; the carrier
+// the record's ErrField wrapped around the key guard's refusal; the carrier
 // check takes that sentinel as a parameter, carrier Params.ErrIdentity, and
 // verify.Verify's own later identity parse ("identity key: ...") is
 // unreachable because Validate refuses first. Off-curve and mineable is
@@ -236,7 +236,7 @@ func TestOffCurveIdentityKey(t *testing.T) {
 	f := newFixture(t)
 	offCurve := [33]byte{0x02}
 	offCurve[32] = 0x05
-	const identityReason = "record: field has the wrong shape: identity key: invalid square root"
+	const identityReason = "record: field has the wrong shape: identity key: guard: public key refused: invalid square root"
 
 	for _, e := range storeEntries() {
 		t.Run(e.name+"/off curve", func(t *testing.T) {

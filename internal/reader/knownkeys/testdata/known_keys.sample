@@ -3,5 +3,5 @@
 # matched for verification. @retired is terminal.
 
 alice@example.com secp256k1 02a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90 seq=7 first=2026-09-14T10:02:11Z last=2026-09-14T18:40:03Z fp=SHA256:o/ma3UeRhFI6x58etDGw5IqNJebvyHicEg1EYaC6Uvo
-@rotated-from alice@example.com secp256k1 03ff00112233445566778899aabbccddeeff00112233445566778899aabbccddee until_seq=6 at=2026-09-14T18:40:03Z fp=SHA256:K1QmpZIIwdM6gIswwUrceehW27htg7OwpNsOflGb3JM
-@retired bob@example.com secp256k1 02cc9a00112233445566778899aabbccddeeff00112233445566778899aabbccdd at=2026-09-12T08:00:00Z fp=SHA256:3eKHkA7POuVexes3wbjsJJZ9HeKkgoAnu6zbpV/EEeA
+@rotated-from alice@example.com secp256k1 0324653eac434488002cc06bbfb7f10fe18991e35f9fe4302dbea6d2353dc0ab1c until_seq=6 at=2026-09-14T18:40:03Z fp=SHA256:p80oF5TbGEhPJA2b38CSIauJ63wV48p6tnwwY89tfjc
+@retired bob@example.com secp256k1 02d8b9f4b27f4b5a6a0d8f29c1a7e6a5d4c3b2a1908f7e6d5c4b3a2918f7e6d5c4 at=2026-09-12T08:00:00Z fp=SHA256:dOoHkTIf4dWx4QWXnlAATrg63BoBS+nsU/lKPc96B2A

@@ -65,7 +65,7 @@ bytes pushed.
 | key | field | type | note |
 | --- | --- | --- | --- |
 | 0 | `magic` | bytes(4) | `"bfr"` + version `0x01`. The version is what lets this table change |
-| 1 | `identityKey` | bytes(33) | the subject, a compressed key (`02`/`03`). **Not on chain** |
+| 1 | `identityKey` | bytes(33) | the subject, a compressed key (`02`/`03`) in its one encoding (below). **Not on chain** |
 | 2 | `seq` | uint | `1` on kinds 1, 5 and 6; each transition is the previous `seq + 1` |
 | 3 | `kind` | uint, 1 to 6 | `1` create, `2` update, `3` rotate, `4` retire, `5` sub-record, `6` manifest (§4.3, §5) |
 | 4 | `prev` | bytes(32) | `C_{n-1}`, the previous carrier's txid in hash byte order; all zero on kinds 1, 5, 6 |
@@ -76,12 +76,20 @@ bytes pushed.
 | 9 | `notAfter` | uint | unix seconds; 0 = unbounded. When both are non-zero, `notBefore <= notAfter` |
 | 10 | `body` | map, text keys | the profile. Encoded size at most 16 KiB (16384 bytes) for kinds 1 to 4, 64 KiB (65536 bytes) for kinds 5 and 6 (§5) |
 | 11 | `refs` | array | store entries `{name, root, count, head?}`, at most 64, §5. May be empty |
-| 12 | `successor` | bytes(33) | rotate only: the next identity key, compressed |
+| 12 | `successor` | bytes(33) | rotate only: the next identity key, compressed, in its one encoding |
 
 Keys 0 to 6 and 8 to 11 are required on every record. Integer keys above 12
 are unknown to this version: any party that re-encodes a record preserves them
 and any party that reads one ignores them (BRC-174 §3.2's rule; a
 reconstruction that drops a field destroys a future extension invisibly).
+
+**A key has one encoding.** `identityKey`, `successor` and the key of every
+lock in this document are 33 bytes: the prefix `02` or `03`, then an `x` below
+the field prime `p` that names a point on the curve. A compressed key whose `x`
+is at or above `p` (`02 || p+1` is read by some SDKs as the point with
+`x = 1`) is a second spelling of one point, so anything keyed by key bytes,
+such as a pin, an index or a successor match, would see two keys. A reader
+refuses such a record (`REFUSED-DECODE`); a host refuses it as `bad-record`.
 
 ## 3. The carrier and the commitment
 
@@ -322,6 +330,17 @@ block the host knows is refused, which makes the proof safe to take from
 anyone. Upgrading a funding tree also upgrades every carrier that spent it.
 
 ## 7. The host
+
+Every PushDrop here (the token, the record output, the funding output) is
+admitted only as the one script the lock-before template writes for its key
+and fields: the key pushed directly in its one encoding (§2), `OP_CHECKSIG`,
+each field in its minimal push, `OP_2DROP` per pair of fields and `OP_DROP`
+for one left over, and nothing else. A wider push, loose drops or a trailing
+opcode spell the same fields another way, and a host keyed on script bytes
+would see two outputs where there is one. Such a token is refused as
+`bad-tag`, such a record output refuses its carrier as `bad-record`, and such
+a funding-shaped output is not a funding output. A reader refuses either at
+decode (`REFUSED-DECODE`).
 
 **Topic manager** (`tm_finger`) admits each output on its own validity:
 

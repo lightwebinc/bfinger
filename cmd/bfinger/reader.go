@@ -16,6 +16,7 @@ import (
 
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 
+	"github.com/lightwebinc/bcommon/guard"
 	"github.com/lightwebinc/bcommon/headers"
 	"github.com/lightwebinc/bcommon/hostset"
 	"github.com/lightwebinc/bcommon/resolve"
@@ -397,7 +398,7 @@ func resolveAndVerify(ctx context.Context, g *global, acctArg string, stderr *os
 	if kb, err := hex.DecodeString(acctArg); err == nil && len(kb) == 33 && (kb[0] == 0x02 || kb[0] == 0x03) {
 		// An identity key is an address too: no domain, no manifest, and the
 		// host must come from configuration. The pin is keyed by the hex.
-		if identity, err = ec.PublicKeyFromBytes(kb); err != nil {
+		if identity, err = guard.ParsePubKey(kb); err != nil {
 			return nil, usage("not a valid compressed key")
 		}
 		keyBytes = kb
@@ -424,7 +425,7 @@ func resolveAndVerify(ctx context.Context, g *global, acctArg string, stderr *os
 			return nil, fmt.Errorf("resolve %s: %w", acct, err)
 		}
 		lr.Resolved = h
-		if identity, err = ec.PublicKeyFromBytes(h.IdentityKey[:]); err != nil {
+		if identity, err = guard.ParsePubKey(h.IdentityKey[:]); err != nil {
 			return nil, fmt.Errorf("resolve %s: identity key: %w", acct, err)
 		}
 		keyBytes = h.IdentityKey[:]

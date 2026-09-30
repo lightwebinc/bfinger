@@ -35,6 +35,7 @@ func TestFundImportsAMinedPaymentToTheFundAddress(t *testing.T) {
 		t.Fatal(err)
 	}
 	tx := transaction.NewTransaction()
+	spendsMadeUp(tx)
 	tx.AddOutput(&transaction.TransactionOutput{Satoshis: 1, LockingScript: fund})
 	tx.AddOutput(&transaction.TransactionOutput{Satoshis: 5000, LockingScript: fund})
 	txid := tx.TxID()
@@ -87,6 +88,7 @@ func TestFundImportsAMinedPaymentToTheFundAddress(t *testing.T) {
 
 	known = false
 	other := transaction.NewTransaction()
+	spendsMadeUp(other)
 	other.AddOutput(&transaction.TransactionOutput{Satoshis: 7, LockingScript: fund})
 	other.MerklePath = transaction.NewMerklePath(height, [][]*transaction.PathElement{{{Offset: 0, Hash: other.TxID(), Txid: &isTxid}}})
 	beef, _ = other.BEEFHex()

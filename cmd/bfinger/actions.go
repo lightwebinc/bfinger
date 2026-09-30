@@ -16,11 +16,12 @@ import (
 	"fmt"
 
 	"github.com/bsv-blockchain/go-sdk/chainhash"
-	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/script"
 	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 
+	"github.com/lightwebinc/bcommon/funding"
+	"github.com/lightwebinc/bcommon/guard"
 	"github.com/lightwebinc/bfinger/internal/protocol/carrier"
 	"github.com/lightwebinc/bfinger/internal/protocol/mint"
 	"github.com/lightwebinc/bfinger/internal/protocol/token"
@@ -67,7 +68,7 @@ func txFromAction(b []byte) (*transaction.Transaction, error) {
 	if len(b) == 0 {
 		return nil, errors.New("the wallet answered no transaction")
 	}
-	_, tx, _, err := transaction.ParseBeef(b)
+	_, tx, _, err := guard.ParseBEEF(b, guard.DefaultBound)
 	if err != nil {
 		return nil, fmt.Errorf("the wallet's transaction does not parse: %w", err)
 	}
@@ -129,7 +130,7 @@ func (s *session) tokenViaWallet(ctx context.Context, c [32]byte, prevTok *mint.
 			OutputDescription: "bfinger state token", Basket: basketState, Tags: []string{"bfinger", "token"}}},
 		Labels: []string{"bfinger"}, Options: actionOptions()}
 	if prevTok != nil {
-		beef, err := prevTok.Tx.AtomicBEEF(false)
+		beef, err := funding.BEEF(prevTok.Tx)
 		if err != nil {
 			return nil, fmt.Errorf("previous token as BEEF: %w", err)
 		}
@@ -238,7 +239,7 @@ func (s *session) sweepViaWallet(ctx context.Context, signer *bwallet.Signer, tr
 	if err != nil {
 		return nil, err
 	}
-	beef, err := tree.AtomicBEEF(false)
+	beef, err := funding.BEEF(tree)
 	if err != nil {
 		return nil, fmt.Errorf("tree as BEEF: %w", err)
 	}
@@ -282,7 +283,7 @@ func receiveViaWallet(ctx context.Context, w wallet.Interface, originator string
 	if err != nil {
 		return fmt.Errorf("notice suffix: %w", err)
 	}
-	sender, err := ec.PublicKeyFromString(n.SenderKeyHex)
+	sender, err := guard.ParsePubKeyHex(n.SenderKeyHex)
 	if err != nil {
 		return fmt.Errorf("notice sender: %w", err)
 	}
