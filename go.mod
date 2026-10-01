@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/bsv-blockchain/go-sdk v1.5.2
-	github.com/lightwebinc/bcommon v0.5.1
+	github.com/lightwebinc/bcommon v0.5.4
 )
 
 require (
