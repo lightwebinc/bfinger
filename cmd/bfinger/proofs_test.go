@@ -44,6 +44,21 @@ func TestAsyncNeedsASettlementLegThatAnswers(t *testing.T) {
 	}
 }
 
+// With a node configured, plane() holds arcade's verdict to it: arcade can
+// answer ACCEPTED_BY_NETWORK for a transaction whose input is already spent
+// by another transaction, which never mines (bcommon v0.5.4).
+func TestArcadeLegHoldsToTheNodeWhenOneIsConfigured(t *testing.T) {
+	cfg := config.Defaults()
+	cfg.RPC, cfg.Asset, cfg.Facade, cfg.Settle, cfg.Proofs = "http://127.0.0.1:1", "http://127.0.0.1:2", "http://127.0.0.1:3", "arcade:http://127.0.0.1:8080", "async"
+	l, err := (&global{cfg: cfg}).plane()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if l.arcade.Asset == nil {
+		t.Fatal("configured node not wired into the arcade leg's double-spend check")
+	}
+}
+
 // An arcade proof is a service's answer like a node's, and is held to the
 // same checks: it parses without panicking, it names the transaction asked
 // about, and it agrees with the height arcade reported. A path for some other

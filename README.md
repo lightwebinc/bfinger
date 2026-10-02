@@ -94,12 +94,15 @@ Built and working end to end: the reader (lookups, `verify`, `-watch`,
 `domain-docs`, `serve-wallet`), sub-stores, and the two overlay host modules
 with a container image and a one-file host stack.
 
-Designed, not built yet: handle-certificate verification (BRC-52), a
-messagebox for payment notices, delegation and the named stores it writes,
-host-side charging for lookups, content only a payer can read (BRC-369), and
-a reader-side spend check. [docs/architecture.md](docs/architecture.md#seams)
-lists them all, and [docs/overview.md](docs/overview.md#the-seams-left-open)
-explains the hook that makes each possible.
+Designed, not built yet: handle-certificate verification (BRC-52, built in
+borg, a sibling application; not yet adopted here), a messagebox for payment
+notices (bbox, a sibling application; `bfinger pay` writes its notice to a
+local file until it delivers over one), delegation and the named stores it
+writes, host-side charging for lookups, content only a payer can read
+(BRC-369), and a reader-side spend check.
+[docs/architecture.md](docs/architecture.md#seams) lists them all, and
+[docs/overview.md](docs/overview.md#the-seams-left-open) explains the hook
+that makes each possible.
 
 ## Build
 

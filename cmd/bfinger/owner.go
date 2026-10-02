@@ -91,7 +91,11 @@ func (g *global) plane() (*endpoints, error) {
 	case "rpc":
 		l.settle = &publish.RPCSettler{RPC: &nodeapi.RPC{URL: addr, User: g.cfg.RPCUser, Pass: g.cfg.RPCPass, ID: "bfinger"}}
 	case "arcade":
-		l.arcade = &publish.Arcade{Base: addr, Key: g.cfg.ArcadeKey}
+		// Asset, when a node is configured, holds arcade's verdict to the
+		// node's view of the inputs: arcade can answer ACCEPTED_BY_NETWORK
+		// for a transaction whose input another transaction already spent,
+		// which never mines (bcommon v0.5.4).
+		l.arcade = &publish.Arcade{Base: addr, Key: g.cfg.ArcadeKey, Asset: asset}
 		l.settle = l.arcade
 	default:
 		return nil, usage("settle must be tcp:<host:port> (bare EF to the ingress), rpc:<url> (node with acknowledgement) or arcade:<url> (an arcade installation)")

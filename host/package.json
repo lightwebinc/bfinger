@@ -1,6 +1,6 @@
 {
   "name": "@lightwebinc/bfinger-host",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "tm_finger and ls_finger: the committed-record topic manager and lookup service, loaded into the reference overlay host as a module",
   "license": "Apache-2.0",

@@ -298,8 +298,11 @@ precedent; nothing in the code speaks them.
 
 Designed, not built: BRC-52 handle certificates (until
 `resolve.VerifyHandleCertificate` runs, the domain's answer is trusted because
-the domain controls it); a messagebox for payment notices; delegation and the
-`grants`, `links` and `media` stores (stores themselves are built); hooks on a
-verified change; [host-side charging](#host-side-charging-a-seam); and a
-reader-side spend check (SPV cannot show an output is unspent, so a reader that
-trusts no host would need a UTXO index).
+the domain controls it; the verifier itself is built in borg, a sibling
+application, and not yet adopted here); a messagebox for payment notices
+(bbox, a sibling application; `pay` writes its notice to a local file until it
+delivers over one); delegation and the `grants`, `links` and `media` stores
+(stores themselves are built); hooks on a verified change; [host-side
+charging](#host-side-charging-a-seam); and a reader-side spend check (SPV
+cannot show an output is unspent, so a reader that trusts no host would need a
+UTXO index).

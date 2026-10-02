@@ -82,8 +82,10 @@ drawn in [architecture.md](architecture.md#deployment-shapes).
 `bfinger pay alice@example.com 5000 -yes` derives a fresh destination from the identity key the lookup
 verified (BRC-29), pays it, waits for the proof, and writes the notice the
 recipient claims it with to `payments/<txid>.json`. Delivering the notice is
-yours to arrange (the messagebox is a seam). You pay the key that just proved
-it controls the name, not an address pasted from an email.
+yours to arrange today (the messagebox is a seam); bbox, a sibling
+application built the same way as bfinger, is meant to close it, and `pay`
+will move onto it once it does. You pay the key that just proved it controls
+the name, not an address pasted from an email.
 
 **Your own wallet can do it all.** With `wallet = wire` and
 `funding = wallet`, a BRC-100 wallet on your machine holds the identity, funds
