@@ -92,7 +92,8 @@ leg.
 `timeout` and `quorum` must parse; anything else exits 2 naming the key.
 
 **When a node is needed.** `rpc` and `asset` are both required by `fund`
-(mining or `-rescan`) and by every sending command, except that with
+without `-txid` (mining or `-rescan`, coinbase: only on a regtest chain you
+run, for development and tests) and by every sending command, except that with
 `settle = arcade:<url>`, `proofs = async` and `header_url` set, a publisher
 needs no node: the tip comes from the header source and the proof from the ARC
 service (`kill` and `pay` poll it for their proofs). `funding = wallet`
@@ -125,8 +126,8 @@ own chaintracks service or node. A header that fails the check is an error
 | `HOME` | the default home is `$HOME/.bfinger` |
 | `LC_ALL`, `LC_CTYPE`, `LANG` | the first one set decides whether the terminal is UTF-8; if it names no UTF-8 encoding, `-ascii` is the default. None set is UTF-8 |
 
-`NO_COLOR` and `TERM` are not consulted: bfinger adds no colour of its own, and
-a record's colour is shown only with `-ansi`, honoured as typed.
+`NO_COLOR` and `TERM` are not consulted: bfinger adds no color of its own, and
+a record's color is shown only with `-ansi`, honored as typed.
 
 ## Global flags
 
@@ -162,7 +163,7 @@ side of the address. `-json` and `-v` are also global flags.
 | `-v` | `false` | the step trace on stderr; `verify` always prints it |
 | `-yes` | `false` | accept a first-contact pin without prompting. Required in a script |
 | `-accept-unmined` | `true` for a lookup, `false` for `verify` | exit 0 on `VERIFIED-UNMINED`. Turn off with `-accept-unmined=false` |
-| `-ansi` | `false` | let a record's colour through: SGR sequences only, re-validated, each coloured value ending with a reset |
+| `-ansi` | `false` | let a record's color through: SGR sequences only, re-validated, each colored value ending with a reset |
 | `-ascii` | `false`, or `true` when the locale is not UTF-8 | print characters above 7 bits as `?` |
 | `-watch` | `false` | poll and print every change until interrupted |
 | `-interval DUR` | `15s` | the poll interval with `-watch` |
@@ -189,10 +190,10 @@ without `-yes` or with `-dry-run` (exit 2).
 
 | Command | Flag | Default | Notes |
 | --- | --- | --- | --- |
-| `fund` | `-txid TXID` | none | import the outputs of a mined transaction that pay the fund address, after checking its proof against `header_url`; mines nothing |
-| `fund` | `-blocks N` | `101` | blocks to mine to the fund address; coinbase matures after 100 more |
-| `fund` | `-batch N` | `30` | blocks per `generatetoaddress` call |
-| `fund` | `-rescan` | `false` | re-read the last `-blocks` blocks for coinbase this wallet holds, instead of mining |
+| `fund` | `-txid TXID` | none | import the outputs of a mined payment you sent to the fund address from your own wallet, after checking its proof against `header_url`; mines nothing. The way to fund a wallet on mainnet and testnet |
+| `fund` | `-blocks N` | `101` | coinbase: only on a regtest chain you run (development and tests). Blocks to mine to the fund address; coinbase matures after 100 more |
+| `fund` | `-batch N` | `30` | coinbase: only on a regtest chain you run (development and tests). Blocks per `generatetoaddress` call |
+| `fund` | `-rescan` | `false` | coinbase: only on a regtest chain you run (development and tests). Re-read the last `-blocks` blocks for coinbase this wallet holds, instead of mining |
 | `create`, `status`, `rotate` | `-set k=v`, `-set k=@file` | none, repeatable | set a body field, from a file with `@` |
 | `create`, `status`, `rotate` | `-unset k` | none, repeatable | remove a body field |
 | `create`, `status`, `rotate` | `-store name=text`, `-store name=@file` | none, repeatable | publish the value as a sub-record in its own carrier and commit to it from the record |

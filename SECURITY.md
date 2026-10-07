@@ -12,4 +12,4 @@ In scope: anything that lets a reader print `VERIFIED` for an answer that is
 not the owner's current record, accept a key it should refuse, or leak a
 private key; anything that lets a host admit or serve a record the rules in
 [docs/committed-record.md](docs/committed-record.md) refuse; and the release
-artefacts and images.
+artifacts and images.

@@ -7,6 +7,74 @@ files in [owner-flow.md](owner-flow.md), the pin grammar in
 [host-selection.md](host-selection.md), and every key, flag and default in
 [configuration.md](configuration.md).
 
+## Start here: the real network
+
+These run against BSV mainnet as written. `1bsv@lightweb.net` is a live
+address whose domain names its own host, so a reader needs only a header
+source. Heights, sequence numbers and dates move as the record is updated.
+
+```console
+$ bfinger -header-url woc:main 1bsv@lightweb.net -yes | head -4
+1bsv@lightweb.net
+  VERIFIED   signature, sequence 2 (update), proof at height 968974
+  key        03dd1a…3902  (pinned 2026-10-07 (first contact))
+  org        Lightweb Inc.
+$ bfinger -header-url woc:main 1bsv@lightweb.net -field status
+1971 called; the .plan is back.
+$ bfinger -header-url woc:main verify 1bsv@lightweb.net 2>&1 >/dev/null | tail -4   # the trace is on stderr
+   ok   pin          matches
+   ok   chain        prev 328fe3df65603327e00ca17d871ae5fac75674b7fffb393b64d4089d91abc5c9 seq 1 witness ok
+   ok   window       inside
+   ok   VERIFIED
+$ bfinger -header-url woc:main -json 1bsv@lightweb.net | jq -r '.code, .height'
+VERIFIED
+968974
+$ bfinger keys list
+1bsv@lightweb.net secp256k1 03dd1a5075fca0ad20c637c38e1b26153bb7131c9c5e4d15c6fb403bbf454a3902 seq=2 first=... last=... fp=SHA256:b2qjtM8q8o2KNkQBHt7LlZ7Wwle6n8mrwgSaIPJGAgg
+```
+
+`-yes` pins the key on first contact without a prompt; leave it off to be
+asked. Put `header_url = woc:main` in the config file (or export
+`BFINGER_HEADER_URL=woc:main`) to drop the flag.
+
+**Publishing on mainnet** needs no node, only coin you already own. A
+config for it:
+
+```
+header_url = woc:main
+facade     = https://finger.example.com          # a host that carries tm_finger
+settle     = arcade:https://arc.gorillapool.io/v1
+proofs     = async
+```
+
+```console
+$ bfinger init                        # prints the identity key and a mainnet fund address
+$ # send about 10,000 satoshis from your own wallet to that address; wait for one block
+$ bfinger fund -txid <txid your wallet shows>
+$ bfinger create alice@example.com -set status="hello, world"           # dry run: builds, prints, sends nothing
+$ bfinger create alice@example.com -set status="hello, world" -yes
+$ bfinger status "back soon" -yes
+$ bfinger publish -resume             # later: collects the proofs async left pending
+```
+
+bfinger pays its miner fee at one satoshi per byte with a 250 satoshi floor,
+above the 100 satoshis per 1,000 bytes mainnet ARC services ask today. An
+update's token is under 500 bytes (the live record's latest is 458), so an
+update costs a few hundred satoshis, and the first record also mines a
+funding tree holding one funding output for each of the next 16 carriers. Ten thousand satoshis covers the first
+record and many updates. Example 26 has the output.
+
+**Testnet** works end to end the same way: set `network = test`, use
+`header_url = woc:test` and a testnet ARC (`settle =
+arcade:https://testnet.arc.gorillapool.io/v1`), fund the testnet address
+`init` prints from a testnet faucet or wallet, and import it with `fund
+-txid` (read from WhatsOnChain's testnet API). No public host carries
+`tm_finger` on testnet, so publish to a host you run with `HEADERS=woc:test`
+([self-host.md](self-host.md)) and read with `-host` pointing at it.
+
+**A local development sandbox** (a private regtest chain, no coin needed)
+is the one place `fund` mines coinbase: example 18.
+
 ## Conventions
 
 **Output is exact in shape, illustrative in value.** Columns, spacing and
@@ -201,7 +269,7 @@ $ bfinger -json alice@example.com
 | `body` | the record has fields | byte strings as hex; maps and arrays recurse |
 | `refs` | the record commits to sub-stores | per store: `count`, `head` when linked, `name`, `root` |
 | `stores` | the record links stores | per store as read: `name`, its own `code` (a failed store does not fail the record; `UNSUPPORTED` means this build lacks the feature), `reason`, `count`, `carrierTxid` for one member or `manifestTxid` and `memberTxids`, `body` |
-| `steps` | verification ran | the trace of example 6, one `{"Name", "OK", "Detail"}` per step (capitalised, unlike every other field) |
+| `steps` | verification ran | the trace of example 6, one `{"Name", "OK", "Detail"}` per step (capitalized, unlike every other field) |
 
 A `REFUSED-FORK` is decided before verification: only `acct`, `code`,
 `reason`, `mined` (`false`) and `window` (`[0, 0]`), no `steps`.
@@ -341,7 +409,7 @@ $ bfinger alice@example.com -field status -ascii
 caf? open
 ```
 
-`-ansi` lets a record's colour through (SGR only, re-validated, each coloured
+`-ansi` lets a record's color through (SGR only, re-validated, each colored
 value ending with a reset), whatever `NO_COLOR` and `TERM` say. `-ascii`
 prints every character above `~` (0x7E) as `?`; it is the default when the
 locale is not UTF-8.
@@ -376,7 +444,7 @@ $ bfinger keys trust alice@example.com -key 0324653eac434488002cc06bbfb7f10fe189
 pinned alice@example.com 0324653eac434488002cc06bbfb7f10fe18991e35f9fe4302dbea6d2353dc0ab1c SHA256:p80oF5TbGEhPJA2b38CSIauJ63wV48p6tnwwY89tfjc
 ```
 
-The address is normalised, so `BOB+work@Example.COM` pins `bob@example.com`.
+The address is normalized, so `BOB+work@Example.COM` pins `bob@example.com`.
 Refusals (the first three exit `1`, the rest `2`):
 
 ```
@@ -478,32 +546,11 @@ test` or `regtest` the fund address has the testnet prefix
 key stays in the wallet and the first line is `created <home> for the wire
 wallet at <wallet_url>`.
 
-## 17. `fund`: mine, or rescan
+## 17. `fund -txid`: import a payment you sent
 
-Mines blocks paying the fund key on the configured node
-(`generatetoaddress`), so it is for a chain you control:
-
-```console
-$ bfinger fund
-wallet before: 0 output(s), 0 sat; node tip 101
-wallet after:  101 output(s), 505000000000 sat (+101); immature 100; node tip 202
-$ bfinger fund -rescan -blocks 200
-wallet before: 45 output(s), 225000000000 sat; node tip 302
-wallet after:  101 output(s), 505000000000 sat (+56); immature 100; node tip 302
-```
-
-`-blocks 101` (default) matures the first coinbase; `-batch 30` is blocks per
-call. `-rescan` re-reads the last `-blocks` blocks for coinbase this wallet
-holds, after a run that stopped between mining and recording. The wallet is
-opened before the node is looked for, so a home with no identity reports
-``open wallet in /home/alice/.bfinger: bwallet: open identity: ... (run
-`bfinger init`)``, and one with no node `rpc and asset must be configured for
-owner commands (config keys rpc, asset)`.
-
-## 18. `fund -txid`: import a payment
-
-On a chain you do not mine, pay the fund address from any wallet, wait for a
-block, and import the transaction:
+The way to fund a wallet on mainnet or testnet: send a small amount from your
+own wallet to the fund address `init` printed, wait for one block, and import
+the transaction by its txid:
 
 ```console
 $ bfinger fund -txid 9999999999999999999999999999999999999999999999999999999999999999
@@ -525,6 +572,30 @@ bfinger: 9999…9999: WhatsOnChain (main) has no such transaction (status 500); 
 bfinger: 9999…9999: its proof is not in the header source at height 912400
 bfinger: 9999…9999 pays nothing to this home's fund address 113JUEFbhsMD9GiuTFTXV1Vrz9a9MrmC1v
 ```
+
+## 18. `fund` without `-txid`: mine coinbase (regtest only)
+
+Coinbase: only on a regtest chain you run (development and tests). It mines
+blocks paying the fund key on the configured node (`generatetoaddress`), which
+no public network answers; on mainnet and testnet fund the wallet with
+`fund -txid` (example 17).
+
+```console
+$ bfinger fund
+wallet before: 0 output(s), 0 sat; node tip 101
+wallet after:  101 output(s), 505000000000 sat (+101); immature 100; node tip 202
+$ bfinger fund -rescan -blocks 200
+wallet before: 45 output(s), 225000000000 sat; node tip 302
+wallet after:  101 output(s), 505000000000 sat (+56); immature 100; node tip 302
+```
+
+`-blocks 101` (default) matures the first coinbase; `-batch 30` is blocks per
+call. `-rescan` re-reads the last `-blocks` blocks for coinbase this wallet
+holds, after a run that stopped between mining and recording. The wallet is
+opened before the node is looked for, so a home with no identity reports
+``open wallet in /home/alice/.bfinger: bwallet: open identity: ... (run
+`bfinger init`)``, and one with no node `rpc and asset must be configured for
+owner commands (config keys rpc, asset)`.
 
 ## 19. `domain-docs`
 
@@ -742,7 +813,7 @@ proofs     = async
 ```
 
 `arcade_key` is a bearer token, sent only to that URL. Fund with `fund -txid`
-(example 18). A transition returns once the network accepts it; against
+(example 17). A transition returns once the network accepts it; against
 example 20 only these lines change:
 
 ```console
@@ -982,7 +1053,7 @@ sends nothing without `-yes`. Global flags and every configuration key are in
 | `bfinger keys trust <acct>` | `-key` required, `-fingerprint`, `-force` (12) | no |
 | `bfinger keys verify` | (14) | no |
 | `bfinger init` | (16) | no |
-| `bfinger fund` | `-blocks 101`, `-batch 30`, `-rescan` (17), `-txid` (18) | no |
+| `bfinger fund` | `-txid` (17); coinbase on a regtest chain you run: `-blocks 101`, `-batch 30`, `-rescan` (18) | no |
 | `bfinger domain-docs <handle@domain>` | `-host` required, `-key`, `-out bfinger-site` (19) | no |
 | `bfinger create <acct>`, `status [<text>]` | `-set`, `-unset`, `-store`, `-unstore`, `-expires`, `-funding-count 16`, `-funding-sats 1`, `-yes`, `-dry-run` (20, 21) | yes |
 | `bfinger rotate` | the same, and `-successor` (22) | yes |
@@ -1003,7 +1074,8 @@ sends nothing without `-yes`. Global flags and every configuration key are in
 - **Delegation**, **hooks**, and **host-side charging**.
 - **A reader-side spend check**: SPV shows an output existed, never that it is
   still unspent.
-- **Watching the fund address.** Coin enters the wallet through `fund`
-  (mining, or `-txid` of a mined payment), `receive`, and change; a payment
+- **Watching the fund address.** Coin enters the wallet through `fund
+  -txid` (a mined payment), `receive`, change, and on a regtest chain you
+  run, coinbase from `fund`; a payment
   to the fund address is picked up only when its txid is given to `fund
   -txid`. Nothing imports a key.

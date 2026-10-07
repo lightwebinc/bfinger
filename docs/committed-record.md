@@ -181,7 +181,7 @@ verifier checks `SHA-256(S_{n+1}.prevWitness) == S_n.wc`.
 
 Producing `S_{n+1}` therefore needs the spend key (to spend `O_n` and sign
 `K_{n+1}`) **and** `w_n`: two factors that can live in two places. Handing
-`w_n` to a party authorises exactly one next transition, and the spend still
+`w_n` to a party authorizes exactly one next transition, and the spend still
 needs the key, so this is not a delegation mechanism (§5).
 
 ### 4.3 Kinds
@@ -549,7 +549,7 @@ Verified against the pinned versions:
 
 ## 13. Payments, and the directions to keep open
 
-Operators that pay to receive data must be able to monetise their own audiences
+Operators that pay to receive data must be able to monetize their own audiences
 directly; payments to individuals do not ride a one-to-many transmission
 mechanism; the incentive to place data on the fabric is the value of the data
 itself. For this substrate:
@@ -622,7 +622,7 @@ Three supports, strongest first:
 Two rules keep support 1 from being bypassed by a spelling:
 
 - A priced class MUST NOT be a superset of a free class: `{identityKey, fast}`
-  is not a licence to charge for the base answer.
+  is not a license to charge for the base answer.
 - `ls_finger` MUST refuse a question carrying a `query` member it does not
   define (it defines `identityKey`, `pending` and `carrier`). Ignoring one would
   let any extra word make a priceable alias of a free class.
@@ -699,7 +699,7 @@ commitment, BRC-369 carries the restriction.
 
 ## 15. Open
 
-- Grants for organisations at scale: a `grants` root re-published per change is
+- Grants for organizations at scale: a `grants` root re-published per change is
   one mined transaction per membership change; a sub-store with its own chain
   may be wanted.
 - Store members share the primary record's funding trees, so a kill retracts

@@ -57,7 +57,7 @@ not erasure.
 Public to every subscribed host and served without authentication; no
 confidentiality is claimed. The one secret is the witness: each record
 publishes `SHA-256(w)` and withholds `w`, which appears only inside the next
-record and authorises exactly one next transition.
+record and authorizes exactly one next transition.
 
 ## Sub-stores
 

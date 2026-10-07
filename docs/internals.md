@@ -72,7 +72,7 @@ internal/
 host/               tm_finger and ls_finger in TypeScript, and the finger-host image
 deploy/             the self-host compose file
 docs/               the specification and these documents
-scripts/            third-party licence generation
+scripts/            third-party license generation
 testdata/golden/    the shared vector every implementation checks, and a Go-only mint vector
 testdata/fixtures/  recorded header-source and lookup answers
 tools/mintprobe/    the measurement harness behind the frozen choices (its own module)

@@ -124,5 +124,6 @@ $ bfinger alice@example.com -v
 
 - [docs/user-guide.md](docs/user-guide.md): everything a reader and a publisher can do
 - [docs/self-host.md](docs/self-host.md): running hosts, catching up from peers
-- [docs/examples.md](docs/examples.md): a working example for every command
+- [docs/examples.md](docs/examples.md): a working example for every command,
+  starting with live mainnet commands, testnet, and a local regtest sandbox
 - Stuck? `bfinger doctor` reports your identity, wallet, header source, facade and settlement leg.

@@ -1,7 +1,7 @@
 # host
 
 `tm_finger` and `ls_finger`: the committed-record topic manager and lookup
-service, a module for the reference overlay host (`overlay-blueprints`). The
+service, a module for a reference overlay host (BRC-22 submit, BRC-24 lookup). The
 design is [docs/committed-record.md](../docs/committed-record.md). To run a
 host from the `finger-host` image with its database and TLS front, see
 [docs/self-host.md](../docs/self-host.md); this file is for loading the module
@@ -84,7 +84,7 @@ the reference host passes from v0.2.1
 
 ## Deploying
 
-The artefact is one file, `host/bundle/index.js`, built with `make host` (Node
+The artifact is one file, `host/bundle/index.js`, built with `make host` (Node
 24; `make host-docker` builds and tests inside the Node 24 image). It holds
 both modules with `@lightwebinc/bcommon` inlined and imports only `@bsv/sdk`,
 by bare specifier. The bundle step fails, and removes the file, if any input

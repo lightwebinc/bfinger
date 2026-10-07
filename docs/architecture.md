@@ -142,8 +142,10 @@ sequenceDiagram
 
 **Funding the wallet.** The wallet is bfinger's own and shared with nothing, so
 two tools cannot double spend each other. Coin arrives by `fund -txid` (a mined
-payment to the fund address), `receive` (a BRC-29 payment) or `fund` (coinbase
-on a chain you mine); the first two check the proof against the header source
+payment you sent to the fund address from your own wallet), `receive` (a
+BRC-29 payment), or `fund` without `-txid`, which mines coinbase: only on a
+regtest chain you run (development and tests). The first two check the proof
+against the header source
 ([owner-flow.md](owner-flow.md#coin-into-the-wallet)).
 
 **Settlement.** One mined transaction per transition, one per funding tree (16

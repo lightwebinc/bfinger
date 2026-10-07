@@ -29,7 +29,7 @@ The directory is 0700 and every file bfinger writes in it is 0600.
 | `payments/<txid>.json` | a payment notice, what a messagebox would carry |
 
 The witness in `state.json` is the one secret that is not a key: with the key
-it authorises exactly one next transition, so it is never printed or served.
+it authorizes exactly one next transition, so it is never printed or served.
 
 ## Commands
 
@@ -48,8 +48,9 @@ The wallet is bfinger's own, so no other tool can double-spend it.
 `init` prints the fund address: a mainnet address when `network = main`, a
 testnet one for `test` and `regtest`. Coin arrives three ways: `fund -txid`
 for a mined payment to that address from any wallet, `receive` for a BRC-29
-payment from another bfinger user, and `fund -blocks` for coinbase on a chain
-you can mine (spendable after 100 blocks).
+payment from another bfinger user, and `fund -blocks`, which mines coinbase
+(spendable after 100 blocks). Coinbase: only on a regtest chain you run
+(development and tests).
 
 ```mermaid
 flowchart TD
@@ -146,7 +147,8 @@ with `wallet = wire`.
   re-settles (re-broadcasting a superseded sequence would fork the directory)
   and never reads the journal to decide what to send.
 - A `fund -blocks` run that stopped between mining and adding:
-  `fund -rescan -blocks N`. Any other payment to the fund address:
+  `fund -rescan -blocks N` (coinbase: only on a regtest chain you run,
+  for development and tests). Any other payment to the fund address:
   `fund -txid`.
 - `kill -confirm KILL -yes`: one mined sweep per tree in `trees`, rotations
   included, every output used or not, published to the topic

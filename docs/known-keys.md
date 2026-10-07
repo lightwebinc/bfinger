@@ -23,7 +23,7 @@ ignored. Three record forms:
 @retired <address> secp256k1 <33-byte-key-hex> [key=value ...]
 ```
 
-Recognised `key=value` fields: `seq`, `until_seq` (unsigned decimal),
+Recognized `key=value` fields: `seq`, `until_seq` (unsigned decimal),
 `first`, `last`, `at` (RFC 3339), `fp` (fingerprint).
 
 The key is 33 bytes of hex whose first byte is `02` or `03`, the compressed

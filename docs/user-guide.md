@@ -23,10 +23,12 @@ answer. Sections 2 to 7 cover reading, 8 to 10 publishing, with one binary.
 
 - **Release tarball**: `bfinger_<version>_<os>_<arch>.tar.gz` for
   `linux/amd64`, `linux/arm64`, `darwin/amd64`, `darwin/arm64`, with
-  `SHA256SUMS`. The licence files travel inside the tarball.
+  `SHA256SUMS`. The license files travel inside the tarball.
 - **Container image**: `ghcr.io/lightwebinc/bfinger:<tag>`, distroless,
   `nonroot`, `linux/amd64` and `linux/arm64`.
-- **From source**: `go build ./cmd/bfinger`. The only direct dependencies are
+- **With Go** (1.27.1 or later):
+  `go install github.com/lightwebinc/bfinger/cmd/bfinger@latest`, or
+  `go build ./cmd/bfinger` in a clone. The only direct dependencies are
   go-sdk and `github.com/lightwebinc/bcommon`, both pinned.
 
 `bfinger -version` prints the stamped version and answers even when the config
@@ -102,7 +104,12 @@ finds, so never branch a script on it.
 
 ## 4. Your first lookup
 
-`bfinger -header-url woc:main alice@example.com` runs the chain below.
+`bfinger -header-url woc:main alice@example.com` runs the chain below. To
+try it on a live mainnet address now:
+
+```console
+$ bfinger -header-url woc:main 1bsv@lightweb.net
+```
 
 **Where flags go.** Global flags (`-config`, `-home`, `-host`, `-header-url`,
 `-known-keys`, `-quorum`, `-timeout`, `-json`, `-v`, `-version`) go before the
@@ -160,7 +167,7 @@ alice@example.com
   status     available
 ```
 
-- The address is normalised: lowercased, `acct:` or a leading `@` stripped, a
+- The address is normalized: lowercased, `acct:` or a leading `@` stripped, a
   `+tag` removed, so `alice+work@` and `alice+home@` share one pin.
 - `VERIFIED` is the outcome token (section 5). `sequence 7 (update)` is the
   record's sequence and kind (`create`, `update`, `rotate`, `retire`).
@@ -175,7 +182,7 @@ alice@example.com
   `<name> <CODE> <reason>` for a store that did not verify.
 
 Control characters and escape sequences from a record never reach your
-terminal (except colour under `-ansi`), and each value is bounded at 200 lines
+terminal (except color under `-ansi`), and each value is bounded at 200 lines
 and 512 columns, a cut value ending in `[truncated]`.
 
 `-l` adds the full key, `fp`, `token`, `carrier`, `previous`, `window` (a zero
@@ -188,7 +195,7 @@ agreed.
 
 - **`-json`**: one object with a stable schema; it wins over `-field`. `mined`
   and `window` are always present, `stores[]` carries each store's `code` and
-  full, unbounded `body`, and `steps[]` uses capitalised names
+  full, unbounded `body`, and `steps[]` uses capitalized names
   (`.steps[].Name`). Every field: [examples.md](examples.md).
 - **`-field plan`**: one body field, or the store of that name, bounded like
   the plain rendering. It prints only when the record verified; a refused
@@ -196,9 +203,9 @@ agreed.
   `<CODE> <reason>` in place of its content, with exit 0 because the record
   verified: check the first word, or use `-json`. Under `verify` an unmined
   answer prints the value and exits 1.
-- **`-ansi`**: lets a record's SGR colour through, re-checked rather than
-  copied, and every coloured value ends with a reset. `NO_COLOR` and `TERM`
-  are not consulted: bfinger adds no colour of its own. `-json` escapes
+- **`-ansi`**: lets a record's SGR color through, re-checked rather than
+  copied, and every colored value ends with a reset. `NO_COLOR` and `TERM`
+  are not consulted: bfinger adds no color of its own. `-json` escapes
   everything.
 - **`-ascii`**: record values print characters above 7 bits as `?`. It is the
   default when the first of `LC_ALL`, `LC_CTYPE`, `LANG` that is set names no
@@ -374,7 +381,8 @@ spend real funds. None sends anything without `-yes`: the transition is built,
 discarded. Under `funding = wallet` a missing `-yes`, or `-dry-run`, is
 refused instead (exit 2), because a wallet broadcasts what it signs. `init`, `fund -txid`, `doctor`,
 `receive`, `publish -resume`, `serve-wallet` and `domain-docs` spend nothing.
-`fund` without `-txid` mines on your own node at once.
+`fund` without `-txid` mines coinbase on your own node at once (coinbase:
+only on a regtest chain you run, for development and tests).
 
 **What publishing needs**, beyond `header_url`: `facade` (an overlay submit
 endpoint; a host's own `/submit` works) and `settle`: `arcade:<url>` for any
@@ -382,7 +390,28 @@ ARC service, `rpc:<url>` for a node that acknowledges, or `tcp:<host:port>`
 for bare-EF ingress. A node (`rpc` and `asset`) is needed too, except with
 `settle = arcade:`, `proofs = async` and `funding = home`, where the tip comes
 from the header source and proofs from the ARC service. That node-free setup is the one
-[QUICKSTART.md](../QUICKSTART.md) uses.
+[QUICKSTART.md](../QUICKSTART.md) uses:
+
+```
+header_url = woc:main
+facade     = https://finger.example.com
+settle     = arcade:https://arc.gorillapool.io/v1
+proofs     = async
+```
+
+**What it costs.** bfinger pays miners one satoshi per byte with a 250
+satoshi floor, above the 100 satoshis per 1,000 bytes that mainnet ARC
+services ask today. An update's token transaction is under 500 bytes, so an
+update costs a few hundred satoshis; the first record also mines a funding
+tree holding one funding output for each of the next 16 carriers. About 10,000 satoshis covers the
+first record and many updates. Nothing is charged for a lookup.
+
+**Testnet.** Set `network = test`, `header_url = woc:test` and a testnet ARC
+(`settle = arcade:https://testnet.arc.gorillapool.io/v1`). `init` then prints
+a testnet fund address, and `fund -txid` reads the payment from WhatsOnChain's
+testnet API. No public host carries `tm_finger` on testnet, so run one with
+`HEADERS=woc:test` ([self-host.md](self-host.md)) and use it as both `facade`
+and `-host`.
 
 ```mermaid
 sequenceDiagram
@@ -429,7 +458,7 @@ flowchart LR
   W["any BSV wallet or exchange"] -->|"send to the fund address"| T["mined transaction"]
   T -->|"bfinger fund -txid"| H["coin in this home"]
   P["another bfinger user"] -->|"pay, then receive the notice"| H
-  N["your own regtest node"] -->|"bfinger fund -blocks 101"| H
+  N["regtest node you run (development only)"] -->|"bfinger fund -blocks 101 (coinbase)"| H
 ```
 
 **From any wallet.** Send BSV to the fund address `init` printed and, once it
@@ -454,7 +483,8 @@ wallet serving the BRC-100 wallet wire on loopback, which today means
 **Somebody pays you**: `bfinger pay <your identity key> 50000` on their side,
 `bfinger receive notice.json` on yours (section 10).
 
-**You mine it**, on a chain you control: `bfinger fund -blocks 101` calls
+**You mine it** (coinbase: only on a regtest chain you run, for development
+and tests; no public network answers it): `bfinger fund -blocks 101` calls
 `generatetoaddress` on your node (coinbase matures after 100 blocks), and
 `fund -rescan -blocks N` recovers coinbase a run mined but did not record.
 
@@ -524,11 +554,11 @@ because bare ingress acknowledges nothing.
 In `bfinger status -set plan=@plan.txt -yes`, `-set k=@file` reads a value
 from a file, trailing newlines trimmed. The command prints
 `body N of 16384 bytes` and refuses over the bound. A value may hold printable
-text, newlines, tabs, emoji and ANSI SGR colour; any other escape sequence,
+text, newlines, tabs, emoji and ANSI SGR color; any other escape sequence,
 control or zero-width or bidirectional character, more than 200 lines or a
-line over 512 columns is refused by line number. Readers show colour only with
-`-ansi`, so write for plain text first; half-block art on a coloured
-background keeps its shape as a silhouette without colour.
+line over 512 columns is refused by line number. Readers show color only with
+`-ansi`, so write for plain text first; half-block art on a colored
+background keeps its shape as a silhouette without color.
 
 **Stores.** `bfinger status -store plan=@plan.txt -unset plan -yes` publishes
 the value in a carrier of its own that the record commits to, so the record
