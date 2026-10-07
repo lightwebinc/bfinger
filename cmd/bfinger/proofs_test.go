@@ -54,7 +54,7 @@ func TestArcadeLegHoldsToTheNodeWhenOneIsConfigured(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if l.arcade.Asset == nil {
+	if l.arcade.Spends == nil || l.arcade.Spends != l.chain {
 		t.Fatal("configured node not wired into the arcade leg's double-spend check")
 	}
 }

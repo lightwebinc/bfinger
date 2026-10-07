@@ -75,7 +75,7 @@ func coinbaseSession(t *testing.T, proofs string, withNode bool) (*session, *tra
 			}
 		}))
 		t.Cleanup(srv.Close)
-		l.asset = &nodeapi.Asset{Base: srv.URL}
+		l.chain = &nodeapi.Asset{Base: srv.URL}
 	}
 	sg := e.Signer()
 	s := &session{g: &global{cfg: cfg}, l: l, primary: sg, signer: sg, pool: e.Pool,

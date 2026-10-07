@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/lightwebinc/bcommon/mint"
 )
 
 func TestPrecedence(t *testing.T) {
@@ -74,5 +76,31 @@ func TestHomeMovesKnownKeys(t *testing.T) {
 	c, err = Defaults().Apply(map[string]string{"home": "/tmp/x", "known_keys": "/elsewhere"})
 	if err != nil || c.KnownKeys != "/elsewhere" {
 		t.Fatalf("explicit known_keys must win: %v %+v", err, c)
+	}
+}
+
+// The fee keys build a policy over the network's rate; nothing set is the
+// default, and every value is checked as it is read.
+func TestFeeKeys(t *testing.T) {
+	c := Defaults()
+	f, err := c.Fee.Fees(mint.DefaultFees)
+	if err != nil || f != mint.DefaultFees || c.FundUnmined != "accept" {
+		t.Fatalf("defaults: %v %+v %q", err, f, c.FundUnmined)
+	}
+	c, err = Defaults().Apply(map[string]string{"fee_rate": "50/1000", "fee_floor": "1", "fee_dust": "1", "fee_max_rate": "1/1",
+		"fee_max_tx": "10000", "fee_source": "arc", "fee_policy_urls": "https://a.example, https://b.example", "fund_unmined": "refuse", "chain": "woc:test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f, err = c.Fee.Fees(mint.DefaultFees); err != nil || f.Rate != (mint.Rate{Sats: 50, Bytes: 1000}) || f.Floor != 1 || f.Dust != 1 || f.Max != 10000 {
+		t.Fatalf("fees: %v %+v", err, f)
+	}
+	if len(c.Fee.PolicyURLs) != 2 || c.Fee.PolicyURLs[1] != "https://b.example" || c.FundUnmined != "refuse" || c.Chain != "woc:test" {
+		t.Fatalf("%+v", c)
+	}
+	for k, v := range map[string]string{"fee_rate": "0/1000", "fee_max_rate": "x", "fee_source": "oracle", "fee_floor": "-1", "fund_unmined": "maybe"} {
+		if _, err := Defaults().Apply(map[string]string{k: v}); err == nil {
+			t.Errorf("%s = %s accepted", k, v)
+		}
 	}
 }

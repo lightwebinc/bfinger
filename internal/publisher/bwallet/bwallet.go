@@ -13,6 +13,8 @@ import (
 	"context"
 
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
+	"github.com/bsv-blockchain/go-sdk/script"
+	"github.com/bsv-blockchain/go-sdk/transaction/chaintracker"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 
 	bcbwallet "github.com/lightwebinc/bcommon/bwallet"
@@ -68,6 +70,10 @@ type (
 	Chain = bcbwallet.Chain
 	// HeaderSource is a Chain that also serves raw headers.
 	HeaderSource = bcbwallet.HeaderSource
+	// Import is a funding payment checked and read for the pool.
+	Import = bcbwallet.Import
+	// ImportOptions are an import's choices.
+	ImportOptions = bcbwallet.ImportOptions
 )
 
 const (
@@ -88,7 +94,28 @@ var (
 	ErrIdentityExists = bcbwallet.ErrIdentityExists
 	ErrNoSpendable    = bcbwallet.ErrNoSpendable
 	ErrProfile        = bcbwallet.ErrProfile
+	ErrUnmined        = bcbwallet.ErrUnmined
+	ErrPaysNothing    = bcbwallet.ErrPaysNothing
+	ErrUnprovenParent = bcbwallet.ErrUnprovenParent
 )
+
+// ImportBEEF checks a funding payment handed over as BEEF by the user's own
+// wallet and reads the outputs that pay fund. It needs no lookup: a mined
+// payment's proof, or an unmined one's proven parents, are checked against
+// headers.
+func ImportBEEF(ctx context.Context, beef []byte, fund *script.Script, headers chaintracker.ChainTracker, opt ImportOptions) (*Import, error) {
+	return bcbwallet.ImportBEEF(ctx, beef, fund, headers, opt)
+}
+
+// ImportTxid fetches a mined funding payment and its proof from a chain view
+// (WhatsOnChain, a node), checks the proof against headers, and reads the
+// outputs that pay fund.
+func ImportTxid(ctx context.Context, txid string, fund *script.Script, src interface {
+	nodeapi.TxSource
+	nodeapi.ProofSource
+}, headers chaintracker.ChainTracker) (*Import, error) {
+	return bcbwallet.ImportTxid(ctx, txid, fund, src, headers)
+}
 
 // Create makes a new identity under dir under bfinger's Profile.
 func Create(dir string) (*Embedded, error) { return bcbwallet.Create(dir, Profile) }
@@ -118,7 +145,8 @@ func LoadPool(path string) (*Pool, error) { return bcbwallet.LoadPool(path) }
 //
 // Coinbase: only on a regtest chain you run (development and tests). It
 // calls generatetoaddress on the node, which no public network answers; a
-// real-network wallet is funded by importing a payment (fund -txid).
+// real-network wallet is funded by importing a payment (fund -txid or
+// fund -beef).
 func FundFromCoinbase(ctx context.Context, e *Signer, pool *Pool, rpc *nodeapi.RPC, asset *nodeapi.Asset, blocks, batch int) (int, []string, error) {
 	return bcbwallet.FundFromCoinbase(ctx, e, pool, rpc, asset, blocks, batch)
 }

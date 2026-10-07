@@ -7,167 +7,301 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
+	"os"
 	"strings"
-	"time"
 
 	"github.com/bsv-blockchain/go-sdk/chainhash"
 	"github.com/bsv-blockchain/go-sdk/transaction"
-	"github.com/lightwebinc/bcommon/funding"
+	"github.com/lightwebinc/bcommon/feepolicy"
 	"github.com/lightwebinc/bcommon/guard"
 	"github.com/lightwebinc/bcommon/nodeapi"
+	"github.com/lightwebinc/bcommon/publish"
+	"github.com/lightwebinc/bfinger/internal/protocol/mint"
 	"github.com/lightwebinc/bfinger/internal/publisher/bwallet"
 )
 
-// tip is the chain height a transition is built at: the node's when there is
-// one, otherwise the header source's.
+// tip is the chain height a transition is built at: the header source's when
+// there is one, otherwise the node's.
 func (l *endpoints) tip(ctx context.Context, g *global) (uint32, error) {
-	if l.asset != nil {
-		h, err := l.asset.BestHeader(ctx)
+	if g.cfg.HeaderURL != "" {
+		h := g.headers()
+		h.Timeout = g.cfg.Timeout
+		n, err := h.CurrentHeight(ctx)
+		if err != nil {
+			return 0, fmt.Errorf("header source tip: %w", err)
+		}
+		return n, nil
+	}
+	if l.node != nil {
+		h, err := l.node.BestHeader(ctx)
 		if err != nil {
 			return 0, fmt.Errorf("node tip: %w", err)
 		}
 		return h.Height, nil
 	}
-	h, err := g.headers().CurrentHeight(ctx)
-	if err != nil {
-		return 0, fmt.Errorf("header source tip: %w", err)
-	}
-	return h, nil
+	return 0, usage("needs header_url: the chain tip comes from the header source")
 }
 
-// maxImportBEEF bounds the answer an import reads before it parses it.
+// chainSpec is the chain view's specification: the chain key, else the node
+// the asset key names, else WhatsOnChain on mainnet and testnet. A private
+// chain has no public view, so it has none.
+func (g *global) chainSpec() string {
+	switch {
+	case g.cfg.Chain != "":
+		return g.cfg.Chain
+	case g.cfg.Asset != "":
+		return "asset:" + g.cfg.Asset
+	case g.cfg.Network == "main" || g.cfg.Network == "test":
+		return "woc:" + g.cfg.Network
+	}
+	return ""
+}
+
+// nodeAsset is the node's asset API: the asset key, or a chain view that is
+// exactly one node. Nil when no node is configured.
+func (g *global) nodeAsset() *nodeapi.Asset {
+	if g.cfg.Asset != "" {
+		return &nodeapi.Asset{Base: g.cfg.Asset}
+	}
+	if u, ok := strings.CutPrefix(strings.TrimSpace(g.cfg.Chain), "asset:"); ok && u != "" && !strings.Contains(u, ",") {
+		return &nodeapi.Asset{Base: strings.TrimRight(u, "/")}
+	}
+	return nil
+}
+
+// chainView is where transactions, proofs and spends are read: the chain
+// view nodeapi.ParseChain builds from chainSpec, with every proof it answers
+// checked against the header source. With no header source a node alone is
+// taken as it answers, as it always was; any other view needs one, and nil
+// is returned for the commands that need a view to refuse in their own words.
+func (g *global) chainView() (nodeapi.Chain, error) {
+	spec := g.chainSpec()
+	if spec == "" {
+		return nil, nil
+	}
+	if g.cfg.HeaderURL == "" {
+		if n := g.nodeAsset(); n != nil && (g.cfg.Chain == "" || spec == "asset:"+n.Base) {
+			return n, nil
+		}
+		if g.cfg.Chain != "" {
+			return nil, usage("chain " + spec + " needs header_url: every proof it answers is checked against it")
+		}
+		return nil, nil
+	}
+	h := g.headers()
+	h.Timeout = g.cfg.Timeout
+	src, err := nodeapi.ParseChain(spec, nodeapi.ChainOptions{Headers: h, WoCKey: g.cfg.WoCKey})
+	if err != nil {
+		return nil, usage(fmt.Sprintf("chain %s: %v", spec, err))
+	}
+	return src, nil
+}
+
+// settleSpec is the settlement leg's specification: the settle key, else the
+// network's public arcade.
+func (g *global) settleSpec() (string, error) {
+	if g.cfg.Settle != "" {
+		return g.cfg.Settle, nil
+	}
+	spec, err := publish.DefaultSettle(g.cfg.Network)
+	if err != nil {
+		return "", usage("settle must be configured on network " + g.cfg.Network + ": arcade:<url>, arc:<url>, rpc:<url> or tcp:<host:port>")
+	}
+	return spec, nil
+}
+
+// feeSource is the miner fee policy: the fee keys over mint.DefaultFees, the
+// network's rate. A live policy (fee_source = arc) with no fee_policy_urls
+// asks the arcade or ARC installation bfinger settles through.
+func (g *global) feeSource(l *endpoints) (feepolicy.Source, error) {
+	fc := g.cfg.Fee
+	if fc.Source == feepolicy.SourceARC && len(fc.PolicyURLs) == 0 && l != nil && l.arcade != nil {
+		fc.PolicyURLs = []string{l.arcade.Base}
+	}
+	src, err := fc.Build(mint.DefaultFees)
+	if err != nil {
+		return nil, usage(err.Error())
+	}
+	return src, nil
+}
+
+// sweepRate is the whole satoshis a byte the kill sweep pays, which builds
+// with its own fee loop at a whole-number rate: the policy's rate rounded up,
+// at least one. The kill switch must mine, so it rounds toward paying more.
+func sweepRate(f mint.Fees) uint64 {
+	r := f.Rate
+	if r.Bytes == 0 {
+		r.Sats, r.Bytes = f.SatPerByte, 1
+	}
+	if f.MaxRate.Bytes != 0 && r.Cmp(f.MaxRate) > 0 {
+		r = f.MaxRate
+	}
+	if r.Bytes == 0 || r.Sats == 0 {
+		return 1
+	}
+	return (r.Sats + r.Bytes - 1) / r.Bytes
+}
+
+// maxImportBEEF bounds a BEEF file or stream fund -beef reads.
 const maxImportBEEF = 16 << 20
 
-// wocAPI is the WhatsOnChain API root; a variable so a test can serve it.
-var wocAPI = "https://api.whatsonchain.com/v1/bsv/"
-
-// wocBEEF fetches a mined transaction with its proof, as BEEF, from the
-// public WhatsOnChain API. The answer is not trusted: the caller checks the
-// txid and verifies the proof against the header source.
-func wocBEEF(ctx context.Context, network, txid string, timeout time.Duration) (*transaction.Transaction, error) {
-	if network != "main" && network != "test" {
-		return nil, fmt.Errorf("no public source for network %s: configure asset (a node's asset API) to import from it", network)
+// fetchMined fetches a mined transaction with its proof from the chain view,
+// which checks the proof against the header source. A transaction with no
+// block yet is an error that says so.
+func fetchMined(ctx context.Context, g *global, txid string) (*transaction.Transaction, error) {
+	txid = strings.ToLower(strings.TrimSpace(txid))
+	if _, err := chainhash.NewHashFromHex(txid); err != nil || len(txid) != 64 {
+		return nil, usage("not a transaction id: " + txid)
 	}
-	url := wocAPI + network + "/tx/" + txid + "/beef"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	chain, err := g.importView()
 	if err != nil {
 		return nil, err
 	}
-	resp, err := (&http.Client{Timeout: timeout, Transport: &http.Transport{Proxy: nil}}).Do(req)
+	raw, err := chain.TxRaw(ctx, txid)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w; check the txid and the network", txid, err)
+	}
+	tx, err := guard.ParseTransaction(raw, guard.DefaultBound)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxImportBEEF+1))
+	if got := tx.TxID().String(); got != txid {
+		return nil, fmt.Errorf("the source answered transaction %s for %s", got, txid)
+	}
+	mp, _, err := chain.Proof(ctx, txid)
+	if errors.Is(err, nodeapi.ErrNotMined) {
+		return nil, errors.New(txid + ": not mined yet; try again once it has a block")
+	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%s: its proof: %w", txid, err)
 	}
-	switch {
-	case resp.StatusCode == http.StatusNotFound, resp.StatusCode == http.StatusInternalServerError:
-		// WhatsOnChain answers an unknown transaction with a 500, not a 404.
-		return nil, fmt.Errorf("%s: WhatsOnChain (%s) has no such transaction (status %d); check the txid and the network, and import it once it is mined", txid, network, resp.StatusCode)
-	case resp.StatusCode == http.StatusUnprocessableEntity:
-		// WhatsOnChain serves BEEF only for a mined transaction, and says so
-		// in the body: nothing is wrong with the payment, it is only early.
-		return nil, fmt.Errorf("%s: not mined yet (WhatsOnChain: %s); import it once it has a block", txid, strings.TrimSpace(string(body[:min(len(body), 200)])))
-	case resp.StatusCode != http.StatusOK:
-		return nil, fmt.Errorf("WhatsOnChain: %s: status %d", txid, resp.StatusCode)
-	case len(body) > maxImportBEEF:
-		return nil, fmt.Errorf("WhatsOnChain: %s: answer over %d bytes", txid, maxImportBEEF)
-	}
-	beef, err := hex.DecodeString(string(bytes.TrimSpace(body)))
-	if err != nil {
-		return nil, fmt.Errorf("WhatsOnChain: %s: BEEF is not hex: %w", txid, err)
-	}
-	_, tx, _, err := guard.ParseBEEF(beef, guard.DefaultBound)
-	if err != nil {
-		return nil, fmt.Errorf("WhatsOnChain: %s: BEEF does not parse: %w", txid, err)
-	}
-	if tx == nil {
-		return nil, fmt.Errorf("WhatsOnChain: %s: BEEF names no transaction", txid)
-	}
+	tx.MerklePath = mp
 	return tx, nil
 }
 
-// fetchMined fetches a mined transaction with its proof, from the node's
-// asset API when one is configured and otherwise from WhatsOnChain, and
-// verifies the proof against the header source: an answer the headers do
-// not prove is an error. A transaction with no block yet is an error that
-// says so.
-func fetchMined(ctx context.Context, g *global, txid string) (*transaction.Transaction, error) {
-	txid = strings.ToLower(strings.TrimSpace(txid))
-	want, err := chainhash.NewHashFromHex(txid)
-	if err != nil || len(txid) != 64 {
-		return nil, usage("not a transaction id: " + txid)
-	}
+// importView is the chain view an import reads from, which must check every
+// proof against the header source.
+func (g *global) importView() (nodeapi.Chain, error) {
 	if g.cfg.HeaderURL == "" {
 		return nil, usage("needs header_url: the proof is checked against it")
 	}
-	var tx *transaction.Transaction
-	if g.cfg.Asset != "" {
-		asset := &nodeapi.Asset{Base: g.cfg.Asset}
-		raw, err := asset.TxRaw(ctx, txid)
-		if err != nil {
-			return nil, fmt.Errorf("node: %s: %w", txid, err)
-		}
-		if tx, err = guard.ParseTransaction(raw, guard.DefaultBound); err != nil {
-			return nil, err
-		}
-		if tx.MerklePath, _, err = asset.Proof(ctx, txid); err != nil {
-			return nil, fmt.Errorf("node: %s: its proof: %w", txid, err)
-		}
-	} else if tx, err = wocBEEF(ctx, g.cfg.Network, txid, g.cfg.Timeout); err != nil {
+	chain, err := g.chainView()
+	if err != nil {
 		return nil, err
 	}
-	if !tx.TxID().IsEqual(want) {
-		return nil, fmt.Errorf("the source answered transaction %s for %s", tx.TxID(), txid)
+	if chain == nil {
+		return nil, usage("no chain view on network " + g.cfg.Network + ": configure chain = asset:<url> (a node's asset API) to import from it")
 	}
-	if tx.MerklePath == nil {
-		return nil, errors.New(txid + ": not mined yet; try again once it has a block")
+	return chain, nil
+}
+
+// importTxid adds the outputs of a mined payment to this home's fund address
+// to the pool, with the transaction and its proof, so they can be spent by an
+// unmined transaction that must carry its parent.
+func importTxid(ctx context.Context, g *global, sg *bwallet.Signer, pool *bwallet.Pool, txid string) (int, *bwallet.Import, error) {
+	txid = strings.ToLower(strings.TrimSpace(txid))
+	if _, err := chainhash.NewHashFromHex(txid); err != nil || len(txid) != 64 {
+		return 0, nil, usage("not a transaction id: " + txid)
+	}
+	chain, err := g.importView()
+	if err != nil {
+		return 0, nil, err
+	}
+	fund, err := sg.FundScript()
+	if err != nil {
+		return 0, nil, err
 	}
 	tracker := g.headers()
 	tracker.Timeout = g.cfg.Timeout
-	ok, err := tx.MerklePath.Verify(ctx, want, tracker)
+	im, err := bwallet.ImportTxid(ctx, txid, fund, chain, tracker)
 	if err != nil {
-		return nil, fmt.Errorf("%s: checking its proof: %w", txid, err)
+		return 0, nil, importError(sg, txid, err)
 	}
-	if !ok {
-		return nil, fmt.Errorf("%s: its proof is not in the header source at height %d", txid, tx.MerklePath.BlockHeight)
-	}
-	return tx, nil
+	added, err := pool.Add(im.Outputs...)
+	return added, im, err
 }
 
-// importTxid adds the outputs of a mined transaction that pay this home's
-// fund address to the pool, with the transaction and its proof, so they can
-// be spent by an unmined transaction that must carry its parent.
-func importTxid(ctx context.Context, g *global, sg *bwallet.Signer, pool *bwallet.Pool, txid string) (int, uint64, uint32, error) {
-	tx, err := fetchMined(ctx, g, txid)
-	if err != nil {
-		return 0, 0, 0, err
+// importBEEF adds the outputs of a payment to this home's fund address that
+// the user's wallet handed over as BEEF, from a file or standard input ("-").
+// A mined payment's proof, or an unmined one's proven parents, are checked
+// against the header source; nothing is looked up. An unmined payment's
+// outputs are held until its proof is collected by a later command.
+func importBEEF(ctx context.Context, g *global, sg *bwallet.Signer, pool *bwallet.Pool, path string, refuseUnmined bool) (int, *bwallet.Import, error) {
+	if g.cfg.HeaderURL == "" {
+		return 0, nil, usage("needs header_url: the payment is checked against it")
 	}
-	txid = tx.TxID().String()
+	beef, err := readBEEF(path)
+	if err != nil {
+		return 0, nil, err
+	}
 	fund, err := sg.FundScript()
 	if err != nil {
-		return 0, 0, 0, err
+		return 0, nil, err
 	}
-	var outs []bwallet.Output
-	var sats uint64
-	for i, o := range tx.Outputs {
-		if o.LockingScript == nil || !bytes.Equal(*o.LockingScript, *fund) {
-			continue
+	tracker := g.headers()
+	tracker.Timeout = g.cfg.Timeout
+	im, err := bwallet.ImportBEEF(ctx, beef, fund, tracker, bwallet.ImportOptions{RefuseUnmined: refuseUnmined})
+	if err != nil {
+		return 0, nil, importError(sg, "the payment", err)
+	}
+	added, err := pool.Add(im.Outputs...)
+	return added, im, err
+}
+
+// readBEEF reads a BEEF, binary or hex, from a file or standard input.
+func readBEEF(path string) ([]byte, error) {
+	var r io.Reader = os.Stdin
+	if path != "-" {
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, err
 		}
-		outs = append(outs, bwallet.Output{
-			TxID: txid, Vout: uint32(i), Satoshis: o.Satoshis, //nolint:gosec // output index
-			LockingScript: o.LockingScript.String(), Height: tx.MerklePath.BlockHeight,
-			Raw: tx.Hex(), Bump: funding.BumpHex(tx.MerklePath),
-		})
-		sats += o.Satoshis
+		defer f.Close()
+		r = f
 	}
-	if len(outs) == 0 {
+	b, err := io.ReadAll(io.LimitReader(r, maxImportBEEF+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(b) > maxImportBEEF {
+		return nil, fmt.Errorf("BEEF over %d bytes", maxImportBEEF)
+	}
+	if t := bytes.TrimSpace(b); len(t) > 0 && len(t)%2 == 0 {
+		if h, err := hex.DecodeString(string(t)); err == nil {
+			return h, nil
+		}
+	}
+	return b, nil
+}
+
+// importError words an import's refusals for this home's operator.
+func importError(sg *bwallet.Signer, what string, err error) error {
+	switch {
+	case errors.Is(err, bwallet.ErrPaysNothing):
 		addr, _ := sg.FundAddress(sg.Mainnet)
-		return 0, 0, 0, fmt.Errorf("%s pays nothing to this home's fund address %s", txid, addr)
+		return fmt.Errorf("%s pays nothing to this home's fund address %s", what, addr)
+	case errors.Is(err, bwallet.ErrUnmined):
+		return fmt.Errorf("%s: not mined yet; import it once it has a block, or hand over the wallet's BEEF with fund -beef", what)
+	case nodeapi.IsNotFound(err):
+		return fmt.Errorf("%s: the chain view has no such transaction; check the txid and the network", what)
+	case errors.Is(err, nodeapi.ErrProofRefused):
+		return fmt.Errorf("%s: its proof is not in the header source", what)
 	}
-	added, err := pool.Add(outs...)
-	return added, sats, tx.MerklePath.BlockHeight, err
+	return err
+}
+
+// feeRateOf is the rate a policy charges, as SATS/BYTES.
+func feeRateOf(f mint.Fees) string {
+	if f.Rate.Bytes == 0 {
+		return fmt.Sprintf("%d/1", f.SatPerByte)
+	}
+	return f.Rate.String()
+}
+
+// feeSourceName names a fee_source value, the empty one included.
+func feeSourceName(src string) string {
+	if src == "" {
+		return feepolicy.SourceStatic
+	}
+	return src
 }

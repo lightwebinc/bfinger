@@ -48,6 +48,8 @@ owner commands (the sending ones spend real funds and send nothing without
                 domain-docs and serve-wallet do not):
   init                create the identity; print its key and fund address
   fund -txid TXID     import a mined payment you sent to the fund address
+  fund -beef FILE|-   import a payment your wallet handed over as BEEF
+                      (-unmined accept|refuse: one not mined yet)
   fund [-blocks N | -rescan]
                       mine coinbase to the fund address; coinbase: only on a
                       regtest chain you run (development and tests)
@@ -60,7 +62,7 @@ owner commands (the sending ones spend real funds and send nothing without
   receive <notice>    internalize a payment addressed to this identity
   publish -resume     re-send the object leg for the current state
   serve-wallet        serve this home's wallet over the BRC-100 wire, loopback only
-  doctor              local state, pool, header source, node, journal
+  doctor              local state, pool, header source, chain, leg, fees, journal
   domain-docs <acct> -host URL
                       write the domain's manifest.json and the handle's
                       resolve answer (see docs/self-host.md)
@@ -73,6 +75,12 @@ global flags:
   -header-url SOURCE  header source: woc:main, woc:test, chaintracks:URL or a
                       bridge URL; REQUIRED for VERIFIED, no default
   -known-keys PATH    pin store (default ~/.bfinger/known_keys)
+  -chain SPEC         chain view: woc:main, woc:test, asset:URL (a node), or a
+                      list (default woc:<network>, or asset:<asset key>)
+  -fee-rate S/B       miner fee rate, satoshis per bytes (default 100/1000)
+  -fee-source SRC     static (the rate above) or arc (the broadcaster's policy)
+  -fee-floor N        least fee a transaction pays, satoshis (default 250)
+  -fee-max-rate S/B   cap on the rate, static or live (a live policy: 1/1)
   -quorum N           hosts that must answer identically (default 1)
   -timeout DUR        per request (default 15s)
   -v                  verbose: print every verification step
@@ -157,6 +165,11 @@ func run(args []string, stdout, stderr *os.File) int {
 		host      = fs.String("host", "", "")
 		headerURL = fs.String("header-url", "", "")
 		known     = fs.String("known-keys", "", "")
+		chain     = fs.String("chain", "", "")
+		feeRate   = fs.String("fee-rate", "", "")
+		feeSource = fs.String("fee-source", "", "")
+		feeFloor  = fs.String("fee-floor", "", "")
+		feeMax    = fs.String("fee-max-rate", "", "")
 		quorum    = fs.Int("quorum", 0, "")
 		timeout   = fs.Duration("timeout", 0, "")
 		verbose   = fs.Bool("v", false, "")
@@ -197,6 +210,11 @@ func run(args []string, stdout, stderr *os.File) int {
 	set("host", *host)
 	set("header_url", *headerURL)
 	set("known_keys", *known)
+	set("chain", *chain)
+	set("fee_rate", *feeRate)
+	set("fee_source", *feeSource)
+	set("fee_floor", *feeFloor)
+	set("fee_max_rate", *feeMax)
 	if *quorum > 0 {
 		over["quorum"] = fmt.Sprint(*quorum)
 	}

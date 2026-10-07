@@ -13,11 +13,12 @@ import (
 
 // proofs answers whether a transaction this home published has mined: an
 // arcade installation first when it is the settlement leg, because it
-// tracked what it broadcast and reports a refusal, which a node cannot, and
-// the node for what arcade does not know (a wallet's own broadcast, an
-// earlier ingress).
+// tracked what it broadcast and reports a refusal, which a chain view
+// cannot, and the chain view (WhatsOnChain or a node, every proof checked
+// against the header source) for what arcade does not know (a wallet's own
+// broadcast, a funding payment, an earlier ingress).
 func (s *session) proofs() producer.Proofs {
-	return producer.Proofs{Arcade: s.l.arcade, Asset: s.l.asset}
+	return producer.Proofs{Arcade: s.l.arcade, Source: s.l.chain, Spends: s.l.chain}
 }
 
 // proofOf returns txid's proof and height if it has mined.

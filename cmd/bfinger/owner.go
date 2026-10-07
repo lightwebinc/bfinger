@@ -18,6 +18,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/script"
 	"github.com/bsv-blockchain/go-sdk/transaction"
 
+	"github.com/lightwebinc/bcommon/feepolicy"
 	"github.com/lightwebinc/bcommon/funding"
 	"github.com/lightwebinc/bcommon/guard"
 	"github.com/lightwebinc/bcommon/nodeapi"
@@ -49,11 +50,14 @@ func init() {
 	ownerCommands["pay"] = cmdPay
 }
 
-// endpoints bundles the node and plane endpoints an owner command talks to.
-// Every one of them is configured; none has a default.
+// endpoints bundles the chain and plane endpoints an owner command talks to.
 type endpoints struct {
-	rpc    *nodeapi.RPC
-	asset  *nodeapi.Asset
+	// chain is where transactions, proofs and spends are read: WhatsOnChain,
+	// a node, or both (the chain key). Nil on a private chain with no node.
+	chain nodeapi.Chain
+	// node is the node's asset API when one is configured, for the tip when
+	// there is no header source.
+	node   *nodeapi.Asset
 	settle publish.Settler
 	facade *publish.Facade
 	// arcade is set when the settlement leg is an arcade installation, which
@@ -61,45 +65,41 @@ type endpoints struct {
 	arcade *publish.Arcade
 }
 
+// node is the node coinbase funding mines through. Coinbase: only on a
+// regtest chain you run (development and tests).
 func (g *global) node() (*nodeapi.RPC, *nodeapi.Asset, error) {
-	if g.cfg.RPC == "" || g.cfg.Asset == "" {
-		return nil, nil, usage("rpc and asset must be configured for owner commands (config keys rpc, asset)")
+	asset := g.nodeAsset()
+	if g.cfg.RPC == "" || asset == nil {
+		return nil, nil, usage("rpc and asset must be configured for coinbase funding (config keys rpc, asset), which is only for a regtest chain you run")
 	}
-	return &nodeapi.RPC{URL: g.cfg.RPC, User: g.cfg.RPCUser, Pass: g.cfg.RPCPass, ID: "bfinger"}, &nodeapi.Asset{Base: g.cfg.Asset}, nil
+	return &nodeapi.RPC{URL: g.cfg.RPC, User: g.cfg.RPCUser, Pass: g.cfg.RPCPass, ID: "bfinger"}, asset, nil
 }
 
 func (g *global) plane() (*endpoints, error) {
-	kind, addr, _ := strings.Cut(g.cfg.Settle, ":")
-	// An arcade installation (any ARC service) settles and answers for the
-	// proofs of what it broadcast, and the chain tip comes from the header
-	// source, so with it a node is optional. Every other leg needs one.
-	var rpc *nodeapi.RPC
-	var asset *nodeapi.Asset
-	if kind != "arcade" || g.cfg.RPC != "" || g.cfg.Asset != "" {
-		var err error
-		if rpc, asset, err = g.node(); err != nil {
-			return nil, err
-		}
-	}
 	if g.cfg.Facade == "" {
 		return nil, usage("facade must be configured (config key facade)")
 	}
-	l := &endpoints{rpc: rpc, asset: asset, facade: &publish.Facade{Base: g.cfg.Facade}}
-	switch kind {
-	case "tcp":
-		l.settle = &publish.TCPIngress{Addr: addr}
-	case "rpc":
-		l.settle = &publish.RPCSettler{RPC: &nodeapi.RPC{URL: addr, User: g.cfg.RPCUser, Pass: g.cfg.RPCPass, ID: "bfinger"}}
-	case "arcade":
-		// Asset, when a node is configured, holds arcade's verdict to the
-		// node's view of the inputs: arcade can answer ACCEPTED_BY_NETWORK
-		// for a transaction whose input another transaction already spent,
-		// which never mines (bcommon v0.5.4).
-		l.arcade = &publish.Arcade{Base: addr, Key: g.cfg.ArcadeKey, Asset: asset}
-		l.settle = l.arcade
-	default:
-		return nil, usage("settle must be tcp:<host:port> (bare EF to the ingress), rpc:<url> (node with acknowledgement) or arcade:<url> (an arcade installation)")
+	chain, err := g.chainView()
+	if err != nil {
+		return nil, err
 	}
+	spec, err := g.settleSpec()
+	if err != nil {
+		return nil, err
+	}
+	// The chain's spend view holds arcade's verdict to the inputs: arcade
+	// can answer ACCEPTED_BY_NETWORK for a transaction whose input another
+	// transaction already spent, which never mines (bcommon v0.5.4).
+	opt := publish.SettleOptions{Key: g.cfg.ArcadeKey, RPCUser: g.cfg.RPCUser, RPCPass: g.cfg.RPCPass, RPCID: "bfinger"}
+	if chain != nil {
+		opt.Spends = chain
+	}
+	settle, arcade, err := publish.ParseSettler(spec, opt)
+	if err != nil {
+		return nil, usage(fmt.Sprintf("settle must be arcade:main, arcade:test, arcade:<url> (an arcade installation), arc:<url> (an ARC installation), rpc:<url> (node with acknowledgement) or tcp:<host:port> (bare EF to the ingress): %v", err))
+	}
+	l := &endpoints{chain: chain, node: g.nodeAsset(), settle: settle, arcade: arcade, facade: &publish.Facade{Base: g.cfg.Facade}}
+	kind, _, _ := strings.Cut(spec, ":")
 	// Not waiting for a block is only safe when something has said the
 	// network took the transaction. The bare ingress answers nothing, so
 	// with it the proof is the only evidence a transaction was accepted at
@@ -109,16 +109,20 @@ func (g *global) plane() (*endpoints, error) {
 	if g.cfg.Proofs == "async" && g.cfg.Funding != "wallet" && kind == "tcp" {
 		return nil, usage("proofs = async needs a settlement leg that answers: settle = arcade:<url> or rpc:<url>, or funding = wallet. The bare EF ingress acknowledges nothing, so without waiting for the proof there is no evidence the transaction was accepted")
 	}
-	// Waiting for a block asks the node; with no node, the proof is
+	// The chain tip comes from the header source, or a node without one.
+	if g.cfg.HeaderURL == "" && l.node == nil {
+		return nil, usage("needs header_url: the chain tip comes from the header source, and every proof is checked against it")
+	}
+	if chain == nil && arcade == nil {
+		return nil, usage("settle = " + spec + " needs a chain view to read proofs from: set chain = asset:<url> (a node's asset API)")
+	}
+	// Waiting for a block asks the chain view; with none, the proof is
 	// collected later from the arcade installation instead.
-	if asset == nil && g.cfg.Proofs != "async" {
-		return nil, usage("settle = arcade: with no node (rpc, asset) needs proofs = async: the proof is collected from the arcade installation by a later command")
+	if chain == nil && g.cfg.Proofs != "async" {
+		return nil, usage("with no chain view (chain, or a node's asset) proofs must be async: the proof is collected from the arcade installation by a later command")
 	}
-	if asset == nil && g.cfg.Funding == "wallet" {
-		return nil, usage("funding = wallet needs a node (rpc, asset): the wallet broadcasts through its own service, so only the chain can say when it mined")
-	}
-	if asset == nil && g.cfg.HeaderURL == "" {
-		return nil, usage("settle = arcade: with no node needs header_url: the chain tip comes from the header source")
+	if chain == nil && g.cfg.Funding == "wallet" {
+		return nil, usage("funding = wallet needs a chain view (chain, or a node's asset): the wallet broadcasts through its own service, so only the chain can say when it mined")
 	}
 	return l, nil
 }
@@ -226,29 +230,47 @@ func cmdFund(ctx context.Context, g *global, args []string, stdout, stderr *os.F
 	blocks := fs.Int("blocks", 101, "coinbase: only on a regtest chain you run (development and tests). Blocks to mine to the fund address (the first coinbase matures after 100 more)")
 	batch := fs.Int("batch", bwallet.DefaultFundBatch, "coinbase: only on a regtest chain you run (development and tests). Blocks per generatetoaddress call")
 	rescan := fs.Bool("rescan", false, "coinbase: only on a regtest chain you run (development and tests). Re-read the last -blocks blocks for coinbase we hold instead of mining")
-	txid := fs.String("txid", "", "import the outputs of a mined payment you sent to the fund address from your own wallet (mainnet, testnet or regtest); without it, fund mines coinbase")
+	txid := fs.String("txid", "", "import the outputs of a mined payment you sent to the fund address from your own wallet, read from the chain view (mainnet, testnet or regtest); without -txid or -beef, fund mines coinbase")
+	beef := fs.String("beef", "", "import a payment to the fund address handed over by your own wallet as BEEF, binary or hex, from FILE or - for standard input; needs no lookup")
+	unmined := fs.String("unmined", g.cfg.FundUnmined, "with -beef: accept (a payment not mined yet whose parents are proven, held until its proof arrives) or refuse")
 	if err := fs.Parse(args); err != nil {
 		return helpOrUsage(err, "")
 	}
 	// A stray word is refused before anything is mined: "fund help" must not
 	// mine 101 blocks.
 	if fs.NArg() > 0 {
-		return usage("fund [-txid TXID | -blocks N [-batch N] | -rescan] takes no other words")
+		return usage("fund [-txid TXID | -beef FILE|- [-unmined accept|refuse] | -blocks N [-batch N] | -rescan] takes no other words")
+	}
+	if *txid != "" && *beef != "" {
+		return usage("fund takes -txid or -beef, not both")
+	}
+	if *unmined != "accept" && *unmined != "refuse" {
+		return usage("fund -unmined must be accept or refuse")
 	}
 	sg, pool, err := g.signer(ctx)
 	if err != nil {
 		return err
 	}
-	if *txid != "" {
-		added, sats, height, err := importTxid(ctx, g, sg, pool, *txid)
+	if *txid != "" || *beef != "" {
+		var added int
+		var im *bwallet.Import
+		if *txid != "" {
+			added, im, err = importTxid(ctx, g, sg, pool, *txid)
+		} else {
+			added, im, err = importBEEF(ctx, g, sg, pool, *beef, *unmined == "refuse")
+		}
 		if err != nil {
 			return err
 		}
 		if added == 0 {
-			fmt.Fprintf(stdout, "%s already imported; wallet %d output(s), %d sat\n", *txid, pool.Count(), pool.Balance())
+			fmt.Fprintf(stdout, "%s already imported; wallet %d output(s), %d sat\n", im.Txid, pool.Count(), pool.Balance())
 			return nil
 		}
-		fmt.Fprintf(stdout, "imported %d output(s), %d sat, mined at height %d; wallet %d output(s), %d sat\n", added, sats, height, pool.Count(), pool.Balance())
+		if !im.Mined {
+			fmt.Fprintf(stdout, "imported %d output(s), %d sat, not mined yet: held until its proof is collected by a later command; wallet %d output(s), %d sat\n", added, im.Sats, pool.Count(), pool.Balance())
+			return nil
+		}
+		fmt.Fprintf(stdout, "imported %d output(s), %d sat, mined at height %d; wallet %d output(s), %d sat\n", added, im.Sats, im.Height, pool.Count(), pool.Balance())
 		return nil
 	}
 	rpc, asset, err := g.node()
@@ -563,7 +585,7 @@ func (s *session) sweepFor(ctx context.Context, tr owner.Funding, tf *transition
 		if err != nil {
 			return nil, false, err
 		}
-		if sweep, err = carrier.Sweep(ctx, signer, s.g.cfg.Originator, tree, vouts, fee.Tx, fee.Vout, fee.Unlocker, changeTo, s.fees.SatPerByte, s.fees.Floor); err != nil {
+		if sweep, err = carrier.Sweep(ctx, signer, s.g.cfg.Originator, tree, vouts, fee.Tx, fee.Vout, fee.Unlocker, changeTo, sweepRate(s.fees), s.fees.Floor); err != nil {
 			s.giveBack()
 			return nil, false, fmt.Errorf("sweep of %s: %w", tr.Txid, err)
 		}
@@ -626,10 +648,10 @@ func (s *session) submitTx(ctx context.Context, what string, tx *transaction.Tra
 }
 
 // awaitMined waits for a sent tx's block and gives tx its proof: from the
-// node when there is one, otherwise from the arcade installation that took
-// it.
+// arcade installation that took it, which also reports a refusal, then the
+// chain view; or from the chain view alone for any other leg.
 func (s *session) awaitMined(ctx context.Context, what string, tx *transaction.Transaction) (*transaction.MerklePath, uint32, error) {
-	if s.l.asset != nil {
+	if s.l.arcade == nil && s.l.chain != nil {
 		return s.payer().Await(ctx, what, tx)
 	}
 	mp, height, err := s.awaitArcade(ctx, tx)
@@ -672,16 +694,16 @@ func (s *session) settleToken(ctx context.Context, tok *transaction.Transaction)
 // take well over ten minutes.
 const arcadeWait = time.Hour
 
-// awaitArcade polls the arcade installation for tx's proof, as Payer.Await
-// polls a node.
+// awaitArcade polls the arcade installation, then the chain view, for tx's
+// proof, as Payer.Await polls a chain view. An input the chain view shows
+// spent by another transaction is a refusal, whatever arcade answered.
 func (s *session) awaitArcade(ctx context.Context, tx *transaction.Transaction) (*transaction.MerklePath, uint32, error) {
 	wctx, cancel := context.WithTimeout(ctx, arcadeWait)
 	defer cancel()
 	tick := time.NewTicker(producer.DefaultPoll)
 	defer tick.Stop()
-	txid := tx.TxID().String()
 	for {
-		mp, height, err := s.proofs().Of(wctx, txid)
+		mp, height, err := s.proofs().OfTx(wctx, tx)
 		switch {
 		case err == nil:
 			tx.MerklePath = mp
@@ -705,7 +727,7 @@ func (s *session) payer() *producer.Payer {
 			s.pay.Async = s.async()
 		}
 		if s.l != nil {
-			s.pay.Settler, s.pay.Asset = s.l.settle, s.l.asset
+			s.pay.Settler, s.pay.Chain = s.l.settle, s.l.chain
 		}
 	}
 	return s.pay
@@ -1256,7 +1278,15 @@ func newSession(ctx context.Context, g *global, tf *transitionFlags, stdout, std
 		tf.dryRun = true
 		fmt.Fprintln(stderr, "no -yes given: building only, sending nothing (every owner command spends real funds)")
 	}
-	s := &session{g: g, l: l, primary: primary, pool: pool, st: st, tip: tip, tf: tf, stdout: stdout, stderr: stderr, fees: mint.DefaultFees}
+	fsrc, err := g.feeSource(l)
+	if err != nil {
+		return nil, err
+	}
+	fees, err := fsrc.Fees(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("fee policy: %w", err)
+	}
+	s := &session{g: g, l: l, primary: primary, pool: pool, st: st, tip: tip, tf: tf, stdout: stdout, stderr: stderr, fees: fees}
 	// A state written before funding trees recorded their identity belongs
 	// to the identity it was published under; without this a tree with
 	// spare outputs would be abandoned for a new one on the next transition.
@@ -1805,28 +1835,60 @@ func cmdDoctor(ctx context.Context, g *global, args []string, stdout, stderr *os
 			fmt.Fprintf(stdout, "headers     %s tip %d\n", g.cfg.HeaderURL, n)
 		}
 	}
-	if g.cfg.Asset != "" {
-		if hd, err := (&nodeapi.Asset{Base: g.cfg.Asset}).BestHeader(ctx); err != nil {
-			fmt.Fprintf(stdout, "node        %s: %v\n", g.cfg.Asset, err)
+	if n := g.nodeAsset(); n != nil {
+		if hd, err := n.BestHeader(ctx); err != nil {
+			fmt.Fprintf(stdout, "node        %s: %v\n", n.Base, err)
 		} else {
-			fmt.Fprintf(stdout, "node        %s tip %d\n", g.cfg.Asset, hd.Height)
+			fmt.Fprintf(stdout, "node        %s tip %d\n", n.Base, hd.Height)
+		}
+	}
+	switch spec := g.chainSpec(); {
+	case spec == "":
+		fmt.Fprintln(stdout, "chain       NONE (no node on network "+g.cfg.Network+"; set chain or asset)")
+	default:
+		if _, err := g.chainView(); err != nil {
+			fmt.Fprintf(stdout, "chain       %s: %v\n", spec, err)
+		} else {
+			fmt.Fprintf(stdout, "chain       %s\n", spec)
 		}
 	}
 	if g.cfg.Facade != "" {
 		fmt.Fprintf(stdout, "facade      %s\n", g.cfg.Facade)
-		if kind, addr, _ := strings.Cut(g.cfg.Settle, ":"); kind == "arcade" {
-			// The policy route answers without a transaction, so it shows the
-			// installation is reachable and speaking ARC before anything is
-			// sent to it.
-			a := &publish.Arcade{Base: addr, Key: g.cfg.ArcadeKey}
-			if err := a.Ping(ctx); err != nil {
-				fmt.Fprintf(stdout, "arcade      %s: %v\n", addr, err)
-			} else {
-				fmt.Fprintf(stdout, "arcade      %s answering, proofs %s\n", addr, g.cfg.Proofs)
-			}
-		} else if g.cfg.Settle != "" {
-			fmt.Fprintf(stdout, "settle      %s, proofs %s\n", g.cfg.Settle, g.cfg.Proofs)
+	}
+	var leg *endpoints
+	if spec, err := g.settleSpec(); err != nil {
+		fmt.Fprintf(stdout, "settle      NOT CONFIGURED: %v\n", err)
+	} else if _, a, err := publish.ParseSettler(spec, publish.SettleOptions{Key: g.cfg.ArcadeKey}); err != nil {
+		fmt.Fprintf(stdout, "settle      %s: %v\n", spec, err)
+	} else if a != nil {
+		// The policy route answers without a transaction, so it shows the
+		// installation is reachable and speaking ARC before anything is
+		// sent to it.
+		leg = &endpoints{arcade: a}
+		if err := a.Ping(ctx); err != nil {
+			fmt.Fprintf(stdout, "arcade      %s: %v\n", a.Base, err)
+		} else {
+			fmt.Fprintf(stdout, "arcade      %s answering, proofs %s\n", a.Base, g.cfg.Proofs)
 		}
+	} else {
+		fmt.Fprintf(stdout, "settle      %s, proofs %s\n", spec, g.cfg.Proofs)
+	}
+	if src, err := g.feeSource(leg); err != nil {
+		fmt.Fprintf(stdout, "fees        %v\n", err)
+	} else if f, err := src.Fees(ctx); err != nil {
+		fmt.Fprintf(stdout, "fees        %v\n", err)
+	} else {
+		from := feeSourceName(g.cfg.Fee.Source)
+		if a, ok := src.(*feepolicy.ARC); ok {
+			// What the live policy actually used: a fresh answer, the last
+			// good one, or the static rate because nothing answered.
+			st := a.Status()
+			from = "live policy: " + st.Source
+			if st.Err != nil {
+				from += ", " + st.Err.Error()
+			}
+		}
+		fmt.Fprintf(stdout, "fees        %s sat/bytes, floor %d (%s)\n", feeRateOf(f), f.Floor, from)
 	}
 	j := publish.Journal{Dir: filepath.Join(g.cfg.Home, "journal")}
 	// Report the failure rather than swallowing it. List refuses a directory
