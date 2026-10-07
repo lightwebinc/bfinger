@@ -23,11 +23,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          # Pinned to the BUILDER toolchain, not the go.mod floor. The floor is
-          # held at 1.26.2 on purpose; the shipped stdlib comes from
-          # the Dockerfile builder (golang:1.27-alpine). go-version-file: go.mod
-          # reads the floor, so it exercised a stdlib we never ship -- which
-          # surfaced in vuln.yml as 10 stdlib advisories fixed in 1.26.x.
+          # The go.mod version and the Dockerfile builder (golang:1.27-alpine)
+          # toolchain, so CI tests the stdlib that ships.
           go-version: "1.27.1"
       - name: gofmt
         run: test -z "$(gofmt -l .)"
@@ -42,8 +39,8 @@ jobs:
       # engine, and it is invisible in a diff that only adds an import. The
       # direct set is exactly go-sdk and bcommon, bcommon's own is exactly
       # go-sdk both as its go.mod declares and as its linked packages import,
-      # and go-sdk resolves to v1.5.2 whatever the library asks for.
-      - name: direct dependencies are go-sdk and bcommon, go-sdk at v1.5.2
+      # and go-sdk resolves to v1.7.1 whatever the library asks for.
+      - name: direct dependencies are go-sdk and bcommon, go-sdk at v1.7.1
         run: make deps-check
       # LICENSE-THIRD-PARTY is generated from what the binary actually links,
       # so a new dependency that nobody notices is a licence obligation that

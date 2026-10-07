@@ -130,16 +130,18 @@ The bcommon packages bfinger imports:
 ## Dependencies
 
 Exactly two direct dependencies, asserted by `make deps-check` in CI:
-`github.com/bsv-blockchain/go-sdk` at **v1.5.2** and
+`github.com/bsv-blockchain/go-sdk` at **v1.7.1** and
 `github.com/lightwebinc/bcommon` at a tag. The same check asserts that go.mod
 and go.sum are tidy, that no module is replaced, that bcommon's own direct
 requirements (from its go.mod, and from what its linked packages import) are
-exactly go-sdk, and that go-sdk resolves to exactly v1.5.2, since minimal
+exactly go-sdk, and that go-sdk resolves to exactly v1.7.1, since minimal
 version selection would otherwise let a bcommon tag move it.
 
 The pin is a security decision: below v1.5.0 the SDK sizes a slice from an
 attacker-declared count while parsing a merkle path, so a thirteen byte input
-ends the process with an unrecoverable out-of-memory. No dependency bot may
+ends the process with an unrecoverable out-of-memory, and v1.5.2 through
+v1.7.0 accept a compressed public key whose x is not below the field prime,
+giving one point a second encoding. No dependency bot may
 move it. Every BEEF, raw transaction and BUMP bfinger reads from the network
 also passes `bcommon/guard` first, so that bound no longer rests on the pin
 alone.

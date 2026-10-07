@@ -3,9 +3,8 @@
 # Multi-stage Dockerfile for bfinger. Produces a single static binary at
 # /usr/local/bin/bfinger on a distroless nonroot base.
 #
-# The builder is pinned by digest and is a LATER toolchain than go.mod's floor.
-# The floor is held on purpose, while the stdlib actually shipped comes from
-# here, so scanning sees what we ship rather than what we compile against.
+# The builder is pinned by digest and matches go.mod's Go version, so the
+# stdlib scanning sees is the one that ships.
 #
 # No ENV defaults are baked in. Three settings are addresses of somebody's
 # deployment and deliberately have no default anywhere, the header source
