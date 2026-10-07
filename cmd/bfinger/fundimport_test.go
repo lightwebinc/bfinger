@@ -296,8 +296,8 @@ func TestNoNodeIsNeeded(t *testing.T) {
 	}
 }
 
-// Real transactions pay the network's rate by default; the kill sweep, which
-// takes a whole rate, rounds it up. A live policy with no URLs of its own
+// Real transactions, the kill sweep among them, pay the network's rate by
+// default. A live policy with no URLs of its own
 // asks the broadcaster bfinger settles through, and with none is refused.
 func TestFeePolicy(t *testing.T) {
 	g := &global{cfg: config.Defaults()}
@@ -307,17 +307,6 @@ func TestFeePolicy(t *testing.T) {
 	}
 	if f, err := src.Fees(context.Background()); err != nil || f != mint.DefaultFees || f.Rate != (bcmint.Rate{Sats: 100, Bytes: 1000}) {
 		t.Fatalf("default fees: %v %+v", err, f)
-	}
-	for _, c := range []struct {
-		f    mint.Fees
-		want uint64
-	}{
-		{mint.DefaultFees, 1}, {mint.LegacyFees, 1}, {mint.Fees{Rate: bcmint.Rate{Sats: 7, Bytes: 3}}, 3},
-		{mint.Fees{Rate: bcmint.Rate{Sats: 7, Bytes: 1}, MaxRate: bcmint.Rate{Sats: 2, Bytes: 1}}, 2},
-	} {
-		if got := sweepRate(c.f); got != c.want {
-			t.Errorf("sweepRate(%+v) = %d, want %d", c.f, got, c.want)
-		}
 	}
 	g.cfg.Fee.Source = "arc"
 	if _, err := g.feeSource(nil); err == nil {

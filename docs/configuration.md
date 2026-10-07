@@ -158,8 +158,7 @@ A value written before these defaults, such as
 A transaction pays `ceil(size * SATS / BYTES)` satoshis, at least
 `fee_floor`. The default is the network's rate, `100/1000` (100 satoshis a
 kilobyte), with a 250 satoshi floor, so a small record update pays the floor.
-The kill switch's sweep rounds the rate up to whole satoshis a byte, because it
-must mine.
+The kill switch's sweep pays by the same policy.
 
 `fee_source = arc` asks the broadcaster for the fee policy it publishes
 (ARC's policy endpoint, which arcade answers too) every five minutes, held between `fee_min_rate` and

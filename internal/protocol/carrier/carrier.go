@@ -25,6 +25,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/wallet"
 
 	bccarrier "github.com/lightwebinc/bcommon/carrier"
+	bcmint "github.com/lightwebinc/bcommon/mint"
 	bcpushdrop "github.com/lightwebinc/bcommon/pushdrop"
 	"github.com/lightwebinc/bfinger/internal/protocol/record"
 	"github.com/lightwebinc/bfinger/internal/protocol/token"
@@ -215,4 +216,12 @@ func DecodeFunding(s *script.Script) (*ec.PublicKey, bool) {
 func Sweep(ctx context.Context, w wallet.Interface, originator string, tree *transaction.Transaction, vouts []uint32,
 	fee *transaction.Transaction, feeVout uint32, feeUnlocker transaction.UnlockingScriptTemplate, change *script.Script, feeRate, floor uint64) (*transaction.Transaction, error) {
 	return bccarrier.Sweep(ctx, w, originator, Params(), tree, vouts, fee, feeVout, feeUnlocker, change, feeRate, floor)
+}
+
+// SweepAt is Sweep at a fee policy, the same one minting pays by: the
+// policy's rate (a fraction of a satoshi a byte included) rounded up, at
+// least its floor; see the library's SweepAt.
+func SweepAt(ctx context.Context, w wallet.Interface, originator string, tree *transaction.Transaction, vouts []uint32,
+	fee *transaction.Transaction, feeVout uint32, feeUnlocker transaction.UnlockingScriptTemplate, change *script.Script, fees bcmint.Fees) (*transaction.Transaction, error) {
+	return bccarrier.SweepAt(ctx, w, originator, Params(), tree, vouts, fee, feeVout, feeUnlocker, change, fees)
 }

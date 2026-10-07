@@ -125,23 +125,6 @@ func (g *global) feeSource(l *endpoints) (feepolicy.Source, error) {
 	return src, nil
 }
 
-// sweepRate is the whole satoshis a byte the kill sweep pays, which builds
-// with its own fee loop at a whole-number rate: the policy's rate rounded up,
-// at least one. The kill switch must mine, so it rounds toward paying more.
-func sweepRate(f mint.Fees) uint64 {
-	r := f.Rate
-	if r.Bytes == 0 {
-		r.Sats, r.Bytes = f.SatPerByte, 1
-	}
-	if f.MaxRate.Bytes != 0 && r.Cmp(f.MaxRate) > 0 {
-		r = f.MaxRate
-	}
-	if r.Bytes == 0 || r.Sats == 0 {
-		return 1
-	}
-	return (r.Sats + r.Bytes - 1) / r.Bytes
-}
-
 // maxImportBEEF bounds a BEEF file or stream fund -beef reads.
 const maxImportBEEF = 16 << 20
 

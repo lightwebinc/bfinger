@@ -232,8 +232,9 @@ route. The notice the payee needs is a local file, delivered out of band
 
 Measured on the published test vector ([testdata/golden](../testdata/golden)):
 the create token is 327 bytes and pays 330 satoshis, an update token 440 bytes
-and 446, a kill sweep 398 bytes and 405, at bfinger's fee rate of about 1
-satoshi a byte (250 at least). The carrier pays nothing. On the
+and 446, a kill sweep 398 bytes and 405, at the legacy rate the vectors pin,
+about 1 satoshi a byte (250 at least); at the default network rate each pays
+the 250 satoshi floor. The carrier pays nothing. On the
 network, one update transition is 1954 bytes: 823 for the carrier's Atomic BEEF
 and 1131 for the token's. The publisher pays miners and nobody else; delivery
 is metered where it arrives. A verified lookup of the test vector makes two

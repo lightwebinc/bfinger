@@ -585,7 +585,7 @@ func (s *session) sweepFor(ctx context.Context, tr owner.Funding, tf *transition
 		if err != nil {
 			return nil, false, err
 		}
-		if sweep, err = carrier.Sweep(ctx, signer, s.g.cfg.Originator, tree, vouts, fee.Tx, fee.Vout, fee.Unlocker, changeTo, sweepRate(s.fees), s.fees.Floor); err != nil {
+		if sweep, err = carrier.SweepAt(ctx, signer, s.g.cfg.Originator, tree, vouts, fee.Tx, fee.Vout, fee.Unlocker, changeTo, s.fees); err != nil {
 			s.giveBack()
 			return nil, false, fmt.Errorf("sweep of %s: %w", tr.Txid, err)
 		}
