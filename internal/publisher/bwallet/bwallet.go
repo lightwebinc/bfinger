@@ -115,11 +115,17 @@ func NewIdentityFile(path string) (*ec.PublicKey, error) { return bcbwallet.NewI
 func LoadPool(path string) (*Pool, error) { return bcbwallet.LoadPool(path) }
 
 // FundFromCoinbase mines blocks paying e's fund address into pool.
+//
+// Coinbase: only on a regtest chain you run (development and tests). It
+// calls generatetoaddress on the node, which no public network answers; a
+// real-network wallet is funded by importing a payment (fund -txid).
 func FundFromCoinbase(ctx context.Context, e *Signer, pool *Pool, rpc *nodeapi.RPC, asset *nodeapi.Asset, blocks, batch int) (int, []string, error) {
 	return bcbwallet.FundFromCoinbase(ctx, e, pool, rpc, asset, blocks, batch)
 }
 
 // Rescan adds coinbase outputs paying e's fund script in a height range.
+//
+// Coinbase: only on a regtest chain you run (development and tests).
 func Rescan(ctx context.Context, e *Signer, pool *Pool, asset *nodeapi.Asset, fromHeight, toHeight uint32) (int, error) {
 	return bcbwallet.Rescan(ctx, e, pool, asset, fromHeight, toHeight)
 }

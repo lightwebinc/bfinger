@@ -65,7 +65,7 @@ func readerFlagSet(name string, defaultUnmined bool, stderr *os.File) (*flag.Fla
 	fs.BoolVar(&rf.long, "l", false, "print the full record")
 	fs.BoolVar(&rf.yes, "yes", false, "accept a first-contact pin without prompting")
 	fs.StringVar(&rf.field, "field", "", "print one body field and nothing else")
-	fs.BoolVar(&rf.ansi, "ansi", false, "let a record's colour sequences through to a terminal")
+	fs.BoolVar(&rf.ansi, "ansi", false, "let a record's color sequences through to a terminal")
 	fs.BoolVar(&rf.ascii, "ascii", false, "print non-ASCII characters as ? (default when the locale is not UTF-8)")
 	fs.BoolVar(&rf.acceptUnmined, "accept-unmined", defaultUnmined, "exit 0 on VERIFIED-UNMINED")
 	fs.BoolVar(&rf.watch, "watch", false, "poll and print every change until interrupted")

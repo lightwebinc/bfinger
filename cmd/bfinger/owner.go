@@ -223,10 +223,10 @@ func printIdentity(e *bwallet.Signer, stdout *os.File) error {
 func cmdFund(ctx context.Context, g *global, args []string, stdout, stderr *os.File) error {
 	fs := flag.NewFlagSet("fund", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	blocks := fs.Int("blocks", 101, "blocks to mine to the fund address (the first coinbase matures after 100 more)")
-	batch := fs.Int("batch", bwallet.DefaultFundBatch, "blocks per generatetoaddress call")
-	rescan := fs.Bool("rescan", false, "re-read the last -blocks blocks for coinbase we hold instead of mining")
-	txid := fs.String("txid", "", "import the outputs of a mined transaction that pay the fund address, instead of mining")
+	blocks := fs.Int("blocks", 101, "coinbase: only on a regtest chain you run (development and tests). Blocks to mine to the fund address (the first coinbase matures after 100 more)")
+	batch := fs.Int("batch", bwallet.DefaultFundBatch, "coinbase: only on a regtest chain you run (development and tests). Blocks per generatetoaddress call")
+	rescan := fs.Bool("rescan", false, "coinbase: only on a regtest chain you run (development and tests). Re-read the last -blocks blocks for coinbase we hold instead of mining")
+	txid := fs.String("txid", "", "import the outputs of a mined payment you sent to the fund address from your own wallet (mainnet, testnet or regtest); without it, fund mines coinbase")
 	if err := fs.Parse(args); err != nil {
 		return helpOrUsage(err, "")
 	}

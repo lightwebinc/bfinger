@@ -34,7 +34,7 @@ const usageText = `usage: bfinger [global flags] <acct|identity-key> [-l] [-json
 reader flags:
   -l                  the full record, not one line
   -field NAME         print one body field and nothing else
-  -ansi               let a record's colour through to a terminal (SGR only)
+  -ansi               let a record's color through to a terminal (SGR only)
   -ascii              print non-ASCII as ? (default when the locale is not UTF-8)
   -json               machine output, stable schema (also a global flag)
   -v                  print every verification step (also a global flag)
@@ -47,8 +47,10 @@ owner commands (the sending ones spend real funds and send nothing without
                 -yes; init, fund, doctor, receive, publish -resume,
                 domain-docs and serve-wallet do not):
   init                create the identity; print its key and fund address
-  fund -txid TXID     import a mined payment to the fund address
-  fund                mine coinbase to the fund address (a private chain)
+  fund -txid TXID     import a mined payment you sent to the fund address
+  fund [-blocks N | -rescan]
+                      mine coinbase to the fund address; coinbase: only on a
+                      regtest chain you run (development and tests)
   create <acct>       publish the first record
   status [<text>]     publish an update (-set k=v, -set plan=@file)
   rotate              publish a rotation to a fresh successor key
