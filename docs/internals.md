@@ -64,7 +64,7 @@ The file's grammar is in [known-keys.md](known-keys.md).
 ```
 cmd/bfinger/        the command, and nothing else
 internal/
-  config/           settings; no deployment address (header_url, host, facade, settle, rpc, asset) has a default
+  config/           settings; header_url, host and facade have no default, chain and settle default to public services
   goldentest/       the shared vector's reader
   protocol/         bfinger's formats: record, token, carrier, mint
   reader/           lookup questions, the reader's algorithm, the pin file
@@ -110,12 +110,13 @@ The bcommon packages bfinger imports:
 | `bcommon/store` | Store references and manifests, and the rule that rebuilds a store's root (RFC 6962 arithmetic in `bcommon/commit`, which bfinger's tests also use) |
 | `bcommon/pushdrop` | The BRC-42/43 derivation (counterparty anyone, forSelf) and the tagged PushDrop locked and decoded under it |
 | `bcommon/carrier` | The unmined carrier, its funding outputs, and the sweep that retracts them |
-| `bcommon/mint` | The mined transactions (transition, funding tree, BRC-29 payment) and their fee loop |
+| `bcommon/mint` | The mined transactions (transition, funding tree, BRC-29 payment) and their fee loop, at a rate in satoshis per bytes |
+| `bcommon/feepolicy` | The fee keys as a policy: static, or the broadcaster's live policy held between bounds |
 | `bcommon/funding` | The funding tree a producer keeps between runs, and rebuilding a transaction kept before it mined |
 | `bcommon/producer` | The owner commands' core: fee inputs and change, settlement (waiting, or `proofs = async`), the funding-tree lifecycle, kept unproven transactions, and proof collection that republishes what has mined |
-| `bcommon/publish` | The two legs (TCP ingress, node RPC, arcade; the facade), which never share a socket, and the journal |
-| `bcommon/nodeapi` | The node: JSON-RPC under a caller-set request id, and the asset API proofs come from, each BUMP checked by `bcommon/guard` before the SDK parses it |
-| `bcommon/bwallet` | The embedded BRC-100 wallet (`identity.json`, `wallet.json`), the spendable outputs, and `Signer` over any `wallet.Interface` |
+| `bcommon/publish` | The two legs (`ParseSettler`: arcade, ARC, node RPC, TCP ingress; the facade), which never share a socket, and the journal |
+| `bcommon/nodeapi` | The chain view (`ParseChain`: WhatsOnChain or a node's asset API, every proof checked against the header source) and a node's JSON-RPC under a caller-set request id, each BUMP checked by `bcommon/guard` before the SDK parses it |
+| `bcommon/bwallet` | The embedded BRC-100 wallet (`identity.json`, `wallet.json`), the spendable outputs, `Signer` over any `wallet.Interface`, and the checked import of a funding payment by txid or BEEF |
 | `bcommon/wirewallet` | The BRC-100 wallet wire: `Dial` for `wallet = wire`, `Serve` for `serve-wallet` |
 | `bcommon/termsafe` | The filter every value from someone else's record passes before a terminal, behind `-ansi`, `-ascii` and the `body text` refusal |
 | `bcommon/headers` | The chain tracker: a bridge's `/v1` roots, or WhatsOnChain and chaintracks headers checked for proof of work |

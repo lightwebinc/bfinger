@@ -6,11 +6,12 @@ the reader's side is [committed-record.md](committed-record.md) section 10;
 every flag is in [configuration.md](configuration.md).
 
 Reading needs only `header_url`. Publishing also needs a submit endpoint
-(`facade`), a settlement leg (`settle`), coin in the wallet, and a node
-(`rpc`, `asset`) unless `settle = arcade:` with `proofs = async`, `header_url`
-set and `funding` not `wallet`
-([flows.md 13](flows.md#13-publishing-through-arcade-with-no-node)). None of
-these has a default.
+(`facade`) and coin in the wallet; neither has a default. It needs no node:
+on mainnet and testnet the settlement leg (`settle`) defaults to the public
+arcade and the chain view (`chain`) to WhatsOnChain
+([flows.md 13](flows.md#13-publishing-through-arcade-with-no-node)). A node is
+an option for both, and on a regtest chain the leg, and usually the node, are
+configured.
 
 ## Files under `~/.bfinger`
 
@@ -46,8 +47,9 @@ The wallet is bfinger's own, so no other tool can double-spend it.
 ## Coin into the wallet
 
 `init` prints the fund address: a mainnet address when `network = main`, a
-testnet one for `test` and `regtest`. Coin arrives three ways: `fund -txid`
-for a mined payment to that address from any wallet, `receive` for a BRC-29
+testnet one for `test` and `regtest`. Coin arrives four ways: `fund -txid`
+for a mined payment to that address from any wallet, `fund -beef` for the
+same payment handed over by the wallet as BEEF, `receive` for a BRC-29
 payment from another bfinger user, and `fund -blocks`, which mines coinbase
 (spendable after 100 blocks). Coinbase: only on a regtest chain you run
 (development and tests).
@@ -56,14 +58,11 @@ payment from another bfinger user, and `fund -blocks`, which mines coinbase
 flowchart TD
   IN["fund -txid TXID"] --> V{"TXID is 64 hex and header_url is set"}
   V -->|"no"| U["usage error, exit 2"]
-  V -->|"yes"| SRC{"asset configured"}
-  SRC -->|"yes"| NODE["the node's asset API: the raw transaction and its proof"]
-  SRC -->|"no"| NET{"network is main or test"}
-  NET -->|"no"| E1["error: configure asset"]
-  NET -->|"yes"| WOC["WhatsOnChain: the transaction as BEEF, at most 16 MiB, no proxy"]
-  NODE --> ID{"the answer is TXID and carries a proof"}
-  WOC --> ID
-  ID -->|"no"| E2["error: wrong transaction, or not mined yet"]
+  V -->|"yes"| SRC{"a chain view: chain, else asset, else woc:main or woc:test"}
+  SRC -->|"none (regtest, no node)"| E1["error: configure chain = asset:URL"]
+  SRC -->|"yes"| VIEW["the raw transaction and its proof, from WhatsOnChain or the node"]
+  VIEW --> ID{"the answer is TXID and carries a proof"}
+  ID -->|"no"| E2["error: unknown transaction, or not mined yet"]
   ID -->|"yes"| PROOF{"the proof verifies against the header source"}
   PROOF -->|"no"| E3["error, nothing added"]
   PROOF -->|"yes"| OUTS{"any output pays this home's fund script"}
@@ -75,6 +74,15 @@ flowchart TD
 Every failure exits 2. The source is never trusted: its answer must be the
 transaction asked for and its proof must hold against your own header source
 ([flows.md 2](flows.md#2-header-source)). No node is needed.
+
+`fund -beef FILE` (or `-` for standard input) takes the payment as the BEEF
+the user's wallet hands over and looks nothing up. A mined payment's proof
+must hold against the header source. An unmined one is taken unless
+`-unmined refuse` or `fund_unmined = refuse`, and only when it can mine as it
+stands and every transaction it spends carries a proof the header source
+holds and its scripts verify against them; its outputs go into `wallet.json`
+marked unproven, and step 1 of the next transition collects the proof from the
+chain view and makes them spendable.
 
 ## One transition, step by step
 
@@ -92,8 +100,10 @@ the order and what each step leaves behind.
    published.
 3. **Record, carrier, token.** The carrier spends the next funding output at
    fee zero; its txid is `C`. The token spends the previous token (updates
-   only) and one fee input, at one satoshi per byte with a 250 satoshi floor.
-4. **Journal entry**, then the settlement leg (`tcp:`, `rpc:` or `arcade:`).
+   only) and one fee input, at the network's rate (`fee_rate`, 100 satoshis
+   per 1,000 bytes by default) with a 250 satoshi floor.
+4. **Journal entry**, then the settlement leg (`arcade:` by default, `arc:`,
+   `rpc:` or `tcp:`).
    `proofs = wait` waits for the proof; `async` goes on once the leg reports
    acceptance (with `tcp:`, only when `funding = wallet`).
 5. **State**, saved as soon as the token is settled: sequence, token,
@@ -122,7 +132,7 @@ readers refuse with `REFUSED-KEY` ([flows.md 10](flows.md#10-rotation)).
 
 `pay` derives the destination from the recipient's identity key under
 `[2, "3241645161d8"]` with a fresh prefix and suffix, settles an ordinary
-payment, waits for its proof (from the ARC service when there is no node), and
+payment, waits for its proof (from the broadcaster, then the chain view), and
 writes `payments/<txid>.json` (sender key,
 prefix, suffix, txid, output, atomic BEEF). Carry it to the recipient by hand
 (no messagebox yet). `receive` verifies it against the recipient's own header
@@ -149,7 +159,7 @@ with `wallet = wire`.
 - A `fund -blocks` run that stopped between mining and adding:
   `fund -rescan -blocks N` (coinbase: only on a regtest chain you run,
   for development and tests). Any other payment to the fund address:
-  `fund -txid`.
+  `fund -txid`, or `fund -beef` with the wallet's BEEF.
 - `kill -confirm KILL -yes`: one mined sweep per tree in `trees`, rotations
   included, every output used or not, published to the topic
   ([flows.md 11](flows.md#11-retire-and-kill)).

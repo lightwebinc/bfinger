@@ -93,10 +93,10 @@ and broadcasts every mined transaction, and receives payments; bfinger keeps
 only the carrier, which no wallet may mine. `tools/walletd` is one such wallet.
 
 **Publishing costs one mined transaction per update**; the carrier is free
-because it is never mined, and no host charges to publish. With an ARC
-service as the settlement leg and `proofs = async`, an update is published in
-about two seconds with no node of your own, and its proof is collected by the
-next owner command. Reading costs nothing.
+because it is never mined, and no host charges to publish. With the default
+settlement leg (a public arcade) and `proofs = async`, an update is published
+in about two seconds with no node of your own, and its proof is collected by
+the next owner command. Reading costs nothing.
 [architecture.md](architecture.md#what-each-flow-costs) has the figures.
 
 ## The seams left open

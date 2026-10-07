@@ -15,7 +15,8 @@ movement, and the standards in play. Why it is built this way is in
 | `bfinger` reader | Resolves an address, asks one or more hosts, verifies the answer against a header source, checks the pin |
 | `bfinger` owner commands | Build transitions, pay miners through a settlement leg, submit objects to a facade |
 | Wallet | Embedded (bfinger's own key and coin) or a BRC-100 wallet over the wire (`wallet = wire`) |
-| Settlement leg | Where mined transactions go: an ARC service (`arcade:`), a node's RPC (`rpc:`) or a bare EF ingress (`tcp:`) |
+| Settlement leg | Where mined transactions go: an arcade installation (`arcade:`, the public one by default), an ARC installation (`arc:`), a node's RPC (`rpc:`) or a bare EF ingress (`tcp:`) |
+| Chain view | Where transactions, proofs and spends are read: WhatsOnChain by default, or a node's asset API (`chain`); every proof checked against the header source |
 | Header source | Where proofs are checked: WhatsOnChain, a chaintracks service, or an overlay bridge ([below](#header-sources)) |
 | Overlay host | The reference overlay host with `tm_finger` (admission) and `ls_finger` (lookup); image `ghcr.io/lightwebinc/finger-host` |
 | Facade | Where objects are submitted: `POST /submit` on a host, or on an overlay bridge in front of one |
@@ -29,8 +30,8 @@ flowchart LR
     wal["Wallet"]
   end
   subgraph stl["Settlement"]
-    arc["ARC service"]
-    nod["Node RPC and asset API"]
+    arc["arcade or ARC service"]
+    nod["WhatsOnChain, or a node's RPC and asset API"]
     chn["BSV chain"]
   end
   hs["Header source: WhatsOnChain or chaintracks"]
@@ -97,7 +98,8 @@ any reader pointed at it.
 ## Header sources
 
 The reader and the host check every proof against a header source; the
-publisher uses one to check imported coin and, with no node, for the chain tip.
+publisher uses one to check imported coin and every proof the chain view
+answers, and for the chain tip.
 There is no default (`header_url` is required for anything that prints
 `VERIFIED`).
 
@@ -142,10 +144,11 @@ sequenceDiagram
 
 **Funding the wallet.** The wallet is bfinger's own and shared with nothing, so
 two tools cannot double spend each other. Coin arrives by `fund -txid` (a mined
-payment you sent to the fund address from your own wallet), `receive` (a
-BRC-29 payment), or `fund` without `-txid`, which mines coinbase: only on a
-regtest chain you run (development and tests). The first two check the proof
-against the header source
+payment you sent to the fund address from your own wallet), `fund -beef` (the
+same payment as the BEEF your wallet hands over, mined or not), `receive` (a
+BRC-29 payment), or `fund` without either, which mines coinbase: only on a
+regtest chain you run (development and tests). The first three check the
+payment against the header source
 ([owner-flow.md](owner-flow.md#coin-into-the-wallet)).
 
 **Settlement.** One mined transaction per transition, one per funding tree (16
@@ -155,9 +158,9 @@ carrier never goes to a settlement leg: it is non-final with an nLockTime in
 
 | `settle` | Answers | Needs a node |
 | --- | --- | --- |
-| `arcade:<url>` (any ARC service) | policy synchronously, then the network's verdict | no, when `proofs = async`, `header_url` is set and `funding` is not `wallet` |
-| `rpc:<url>` | the node's answer | yes (`rpc`, `asset`) |
-| `tcp:<host:port>` | nothing: writes EF bytes once and closes | yes (`rpc`, `asset`) |
+| `arcade:main`, `arcade:test` (the default), `arcade:<url>`, `arc:<url>` | policy synchronously, then the network's verdict | no |
+| `rpc:<url>` | the node's answer | the leg is a node; the chain view need not be |
+| `tcp:<host:port>` | nothing: writes EF bytes once and closes | no, on mainnet and testnet |
 
 The settlement leg and the object leg never share a connection. An ingress
 locks a stream's grammar from its first four bytes, so a BEEF written down the
@@ -170,13 +173,15 @@ proof every 5 seconds for up to 10 minutes before publishing. With `proofs =
 async` it publishes once the leg reports the network took the transaction,
 about two seconds, and every later owner command collects outstanding proofs
 first; `publish -resume` collects them and re-sends the current state's
-objects without touching the settlement leg. An ARC leg is asked first, because it
-reports a refusal as well as a proof; the node's asset API answers for anything
-ARC did not broadcast. A proof whose height disagrees with the reported height
+objects without touching the settlement leg. An arcade or ARC leg is asked
+first, because it reports a refusal as well as a proof; the chain view
+(WhatsOnChain, or a node) answers for anything the leg did not broadcast, and
+an input it shows spent by another transaction is a refusal whatever the leg
+said. A proof whose height disagrees with the reported height
 is refused, and every proof is bounds-checked before the SDK parses it. Async
 is refused with `tcp:` (unless `funding = wallet`), where the proof is the only
 evidence of acceptance. `pay` and `kill` always wait for the proof, from the
-ARC service when there is no node.
+leg and then the chain view.
 Two rules keep an unmined chain bounded: a fee input's parent must be a real,
 proven transaction; and change from a transaction still awaiting its proof is
 not spent, except change of the token or tree the transition already carries
@@ -215,8 +220,8 @@ route. The notice the payee needs is a local file, delivered out of band
 
 | Flow | Who pays | Cost |
 | --- | --- | --- |
-| Settlement | the publisher | miner fee, 1 satoshi per byte, 250 satoshi floor |
-| Proof | the publisher | an ARC query, or a node the publisher runs or rents |
+| Settlement | the publisher | miner fee at the network's rate, 100 satoshis per 1,000 bytes, 250 satoshi floor |
+| Proof | the publisher | a query to the leg or WhatsOnChain (free at 3 a second), or a node the publisher runs or rents |
 | Object leg | nobody | one POST per object |
 | Multicast fan-out | each receiving host, on a metered network | delivered bytes |
 | Header delivery to a bridge | the bridge's operator | delivered bytes |

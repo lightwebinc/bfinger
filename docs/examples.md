@@ -37,36 +37,38 @@ $ bfinger keys list
 asked. Put `header_url = woc:main` in the config file (or export
 `BFINGER_HEADER_URL=woc:main`) to drop the flag.
 
-**Publishing on mainnet** needs no node, only coin you already own. A
+**Publishing on mainnet** needs no node and no server of your own, only coin
+you already own. The chain view defaults to WhatsOnChain (`chain = woc:main`)
+and the broadcaster to GorillaPool's public arcade (`settle = arcade:main`). A
 config for it:
 
 ```
 header_url = woc:main
 facade     = https://finger.example.com          # a host that carries tm_finger
-settle     = arcade:https://arc.gorillapool.io/v1
 proofs     = async
 ```
 
 ```console
 $ bfinger init                        # prints the identity key and a mainnet fund address
-$ # send about 10,000 satoshis from your own wallet to that address; wait for one block
-$ bfinger fund -txid <txid your wallet shows>
+$ # send about 10,000 satoshis from your own wallet to that address
+$ bfinger fund -txid <txid your wallet shows>   # once it has a block
+$ bfinger fund -beef payment.beef     # or: the BEEF your wallet handed over, mined or not
 $ bfinger create alice@example.com -set status="hello, world"           # dry run: builds, prints, sends nothing
 $ bfinger create alice@example.com -set status="hello, world" -yes
 $ bfinger status "back soon" -yes
 $ bfinger publish -resume             # later: collects the proofs async left pending
 ```
 
-bfinger pays its miner fee at one satoshi per byte with a 250 satoshi floor,
-above the 100 satoshis per 1,000 bytes mainnet ARC services ask today. An
-update's token is under 500 bytes (the live record's latest is 458), so an
-update costs a few hundred satoshis, and the first record also mines a
-funding tree holding one funding output for each of the next 16 carriers. Ten thousand satoshis covers the first
-record and many updates. Example 26 has the output.
+bfinger pays the network's miner fee, 100 satoshis per 1,000 bytes, with a
+250 satoshi floor per transaction. An update's token is under 500 bytes (the
+live record's latest is 458), so an update pays the floor, and the first
+record also mines a funding tree holding one funding output for each of the
+next 16 carriers. Ten thousand satoshis covers the first record and many
+updates. Example 26 has the output.
 
-**Testnet** works end to end the same way: set `network = test`, use
-`header_url = woc:test` and a testnet ARC (`settle =
-arcade:https://testnet.arc.gorillapool.io/v1`), fund the testnet address
+**Testnet** works end to end the same way: set `network = test` and
+`header_url = woc:test` (the chain view and broadcaster follow: `woc:test`,
+`arcade:test`), fund the testnet address
 `init` prints from a testnet faucet or wallet, and import it with `fund
 -txid` (read from WhatsOnChain's testnet API). No public host carries
 `tm_finger` on testnet, so publish to a host you run with `HEADERS=woc:test`
@@ -546,7 +548,7 @@ test` or `regtest` the fund address has the testnet prefix
 key stays in the wallet and the first line is `created <home> for the wire
 wallet at <wallet_url>`.
 
-## 17. `fund -txid`: import a payment you sent
+## 17. `fund -txid` and `fund -beef`: import a payment you sent
 
 The way to fund a wallet on mainnet or testnet: send a small amount from your
 own wallet to the fund address `init` printed, wait for one block, and import
@@ -560,25 +562,44 @@ $ bfinger fund -txid 99999999999999999999999999999999999999999999999999999999999
 ```
 
 Every output paying the fund address is added with its transaction and proof.
-The transaction comes from the node's asset API when `asset` is set,
-otherwise from WhatsOnChain for `network`, and is not trusted: its txid must
-match and its proof must check against `header_url`. Refusals:
+The transaction comes from the chain view (`chain`: WhatsOnChain for
+`network` by default, a node with `asset:<url>`) and is not trusted: its txid
+must match and its proof must check against `header_url`. Refusals:
 
 ```
-bfinger: fund -txid: not a transaction id
-bfinger: fund -txid needs header_url: the proof is checked against it
-bfinger: no public source for network regtest: configure asset (a node's asset API) to import from it
-bfinger: 9999…9999: WhatsOnChain (main) has no such transaction (status 500); check the txid and the network, and import it once it is mined
-bfinger: 9999…9999: its proof is not in the header source at height 912400
+bfinger: not a transaction id: 9999
+bfinger: needs header_url: the proof is checked against it
+bfinger: no chain view on network regtest: configure chain = asset:<url> (a node's asset API) to import from it
+bfinger: 9999…9999: the chain view has no such transaction; check the txid and the network
+bfinger: 9999…9999: not mined yet; import it once it has a block, or hand over the wallet's BEEF with fund -beef
+bfinger: 9999…9999: its proof is not in the header source
 bfinger: 9999…9999 pays nothing to this home's fund address 113JUEFbhsMD9GiuTFTXV1Vrz9a9MrmC1v
 ```
+
+A wallet that hands over the payment as BEEF (binary or hex, from a file or
+`-` for standard input) needs no lookup and no wait for the block:
+
+```console
+$ bfinger fund -beef payment.beef
+imported 1 output(s), 50000 sat, mined at height 912400; wallet 1 output(s), 50000 sat
+$ bfinger fund -beef unmined.beef
+imported 1 output(s), 50000 sat, not mined yet: held until its proof is collected by a later command; wallet 2 output(s), 100000 sat
+$ bfinger fund -beef unmined.beef -unmined refuse
+bfinger: the payment: not mined yet; import it once it has a block, or hand over the wallet's BEEF with fund -beef
+```
+
+A mined payment's proof is checked against `header_url`. An unmined one is
+taken (unless `-unmined refuse` or `fund_unmined = refuse`) when it can mine
+as it stands, every transaction it spends carries a proof `header_url` holds,
+and its scripts verify against them; its coin is spendable once a later
+command collects its proof from the chain view.
 
 ## 18. `fund` without `-txid`: mine coinbase (regtest only)
 
 Coinbase: only on a regtest chain you run (development and tests). It mines
 blocks paying the fund key on the configured node (`generatetoaddress`), which
 no public network answers; on mainnet and testnet fund the wallet with
-`fund -txid` (example 17).
+`fund -txid` or `fund -beef` (example 17).
 
 ```console
 $ bfinger fund
@@ -595,7 +616,8 @@ holds, after a run that stopped between mining and recording. The wallet is
 opened before the node is looked for, so a home with no identity reports
 ``open wallet in /home/alice/.bfinger: bwallet: open identity: ... (run
 `bfinger init`)``, and one with no node `rpc and asset must be configured for
-owner commands (config keys rpc, asset)`.
+coinbase funding (config keys rpc, asset), which is only for a regtest chain
+you run`.
 
 ## 19. `domain-docs`
 
@@ -800,10 +822,12 @@ in order: `publish -resume [-facade URL]`, `no facade configured` (exit `2`),
 `nothing published yet`, `state has no funding tree; the carrier's parent
 cannot be rebuilt` (exit `1`).
 
-## 26. Publishing with no node: `arcade:` and `proofs = async`
+## 26. Publishing with no node, and `proofs = async`
 
-An ARC service settles and reports proofs, and the header source gives the
-tip, so this needs no node (`rpc`, `asset`):
+The public arcade settles and reports proofs (the default `settle`),
+WhatsOnChain answers for anything it does not know (the default `chain`), and
+the header source gives the tip, so this needs no node (`rpc`, `asset`). Here
+the leg is another arcade installation, named explicitly:
 
 ```
 header_url = woc:main
@@ -813,7 +837,7 @@ proofs     = async
 ```
 
 `arcade_key` is a bearer token, sent only to that URL. Fund with `fund -txid`
-(example 17). A transition returns once the network accepts it; against
+or `fund -beef` (example 17). A transition returns once the network accepts it; against
 example 20 only these lines change:
 
 ```console
@@ -846,16 +870,23 @@ change from 1111111111111111111111111111111111111111111111111111111111111111: mi
 Not yet mined notes `accepted, proof pending`. A transaction the service
 refused prints a `WARNING:` naming what hosts hold that will never mine;
 publish a new transition to supersede it. `pay` and `kill` still wait for
-their block, polling the ARC service, after the notice is written or the
+their block, polling the arcade installation and then the chain view, after the notice is written or the
 sweep posted; a wait that runs out reports the proof as pending and holds the
 change until a later command collects its proof. Configuration refusals, exit `2`:
 
 ```
-bfinger: settle = arcade: with no node (rpc, asset) needs proofs = async: the proof is collected from the arcade installation by a later command
-bfinger: settle = arcade: with no node needs header_url: the chain tip comes from the header source
-bfinger: funding = wallet needs a node (rpc, asset): the wallet broadcasts through its own service, so only the chain can say when it mined
+bfinger: needs header_url: the chain tip comes from the header source, and every proof is checked against it
 bfinger: proofs = async needs a settlement leg that answers: settle = arcade:<url> or rpc:<url>, or funding = wallet. The bare EF ingress acknowledges nothing, so without waiting for the proof there is no evidence the transaction was accepted
-bfinger: settle must be tcp:<host:port> (bare EF to the ingress), rpc:<url> (node with acknowledgement) or arcade:<url> (an arcade installation)
+bfinger: settle must be arcade:main, arcade:test, arcade:<url> (an arcade installation), arc:<url> (an ARC installation), rpc:<url> (node with acknowledgement) or tcp:<host:port> (bare EF to the ingress): ...
+```
+
+On a regtest chain, which has no public broadcaster or chain view:
+
+```
+bfinger: settle must be configured on network regtest: arcade:<url>, arc:<url>, rpc:<url> or tcp:<host:port>
+bfinger: settle = tcp:192.0.2.20:8000 needs a chain view to read proofs from: set chain = asset:<url> (a node's asset API)
+bfinger: with no chain view (chain, or a node's asset) proofs must be async: the proof is collected from the arcade installation by a later command
+bfinger: funding = wallet needs a chain view (chain, or a node's asset): the wallet broadcasts through its own service, so only the chain can say when it mined
 ```
 
 ## 27. `doctor`
@@ -873,8 +904,10 @@ funding     6666666666666666666666666666666666666666666666666666666666666666 9 o
 known_keys  3 line(s) in /home/alice/.bfinger/known_keys
 headers     woc:main tip 912451
 node        http://192.0.2.10:8090 tip 912451
+chain       asset:http://192.0.2.10:8090
 facade      https://finger.example.com
 settle      tcp:192.0.2.20:8000, proofs wait
+fees        100/1000 sat/bytes, floor 250 (static)
 journal     seq 8 update 1111111111111111111111111111111111111111111111111111111111111111 ok
 ```
 
@@ -888,7 +921,9 @@ Other lines, when they apply:
 | `rotation    PENDING to <key>; publish one transition to complete it` | a rotation awaits completion |
 | `proof       token <txid> accepted, pending` (also `funding tree <txid>`, `change from N transaction(s) held until mined`) | `proofs = async`, before the block |
 | `basket      <12 hex> ...` | `funding = wallet`: whether the wallet holds each tree's outputs; `MISMATCH` means something else took some, and a transition refuses to spend those |
-| `arcade      <url> answering, proofs async` | `settle = arcade:`, instead of `settle` |
+| `arcade      <url> answering, proofs async` | an `arcade:` or `arc:` leg (the default), instead of `settle` |
+| `chain       NONE (no node on network regtest; set chain or asset)` | a regtest chain with no node configured |
+| `fees        <rate> sat/bytes, floor <n> (live policy: arc\|cache\|static, <error>)` | `fee_source = arc`: whether the broadcaster's policy answered, a cached answer is in use, or the static rate |
 | `<label>     <url>: <error>` | an endpoint did not answer (exit still `0`) |
 
 Each transition writes a `journal` entry before either leg is sent: `ok`,

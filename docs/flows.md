@@ -82,7 +82,7 @@ flowchart TD
 difficulty 4e9, so a lying WhatsOnChain or chaintracks source must mine a real
 block; `test` and `regtest` have no floor. A `woc:` source that names another
 network, or a spec that does not parse, fails every command at startup with
-exit 2. The same check runs for `receive` and `fund -txid`.
+exit 2. The same check runs for `receive`, `fund -txid` and `fund -beef`.
 
 ### 3. The read path, end to end
 
@@ -345,10 +345,11 @@ it.
 
 ## Publishing
 
-A transition needs a submit endpoint (`facade`), a settlement leg (`settle`:
-`tcp:`, `rpc:` or `arcade:`) and, except in the case of diagram 13, a node
-(`rpc`, `asset`). None has a default; a missing one is a usage error before
-anything is sent. `publish -resume` needs only a facade, `doctor` nothing,
+A transition needs a submit endpoint (`facade`, no default), a settlement leg
+(`settle`: `arcade:`, `arc:`, `rpc:` or `tcp:`; on mainnet and testnet the
+public arcade by default) and a chain view (`chain`: WhatsOnChain on mainnet
+and testnet by default, or a node). No node is needed (diagram 13). A missing
+setting is a usage error before anything is sent. `publish -resume` needs only a facade, `doctor` nothing,
 reading none of them.
 
 ### 12. The two legs of a transition
@@ -358,11 +359,11 @@ flowchart TD
   TX["one signed token, and two BEEF objects"] --> L1["settlement leg"]
   L1 --> EF["tcp: EF in ONE write on a fresh connection, no acknowledgement"]
   L1 --> RPC["rpc: hex to a node, acknowledged, the txid must match"]
-  L1 --> ARC["arcade: EF to POST /tx, up to 15 s for the network's verdict, a refusal is an error"]
+  L1 --> ARC["arcade or arc: EF to POST /tx, up to 15 s for the network's verdict, a refusal is an error"]
   EF --> MINE{"proofs"}
   RPC --> MINE
   ARC --> MINE
-  MINE -->|"wait"| POLL["poll for the proof: 10 min from a node, 1 h from arcade; running out continues unmined"]
+  MINE -->|"wait"| POLL["poll for the proof: 1 h from arcade then the chain view, 10 min from the chain view; running out continues unmined"]
   MINE -->|"async, not with tcp"| GO["go on, the proof is collected by a later command"]
   POLL --> STATE["state.json saved: the token is settled"]
   GO --> STATE
@@ -388,7 +389,7 @@ sequenceDiagram
   participant S as Header source
   participant A as Arcade
   participant F as Facade and hosts
-  Note over B: settle = arcade URL, proofs = async, header_url set, no rpc or asset
+  Note over B: settle and chain at their defaults, proofs = async, header_url set, no rpc or asset
   B->>S: the chain tip
   B->>A: GET /tx/TXID for each kept transaction still unproven
   A-->>B: MINED with a merkle path, pending, or REJECTED
@@ -403,17 +404,22 @@ sequenceDiagram
   Note over B: save state.json with the token's BEEF, print accepted, proof pending
 ```
 
-Any ARC service works. Without a node, `proofs = async` and `header_url` are
-required (usage error otherwise). Arcade's proof is held to a node's checks: it
+Any arcade or ARC installation works; with no `settle` it is GorillaPool's
+public arcade. What arcade does not know (a funding payment, a wallet's own
+broadcast) the chain view answers: WhatsOnChain by default, every proof
+checked against `header_url`. `proofs = wait` works the same way, polling for
+the block. Arcade's proof is held to a node's checks: it
 parses through the BUMP guard, names the transaction asked about, and agrees
 with the reported height. Change from an unproven parent is held until the
-parent proves. `pay` and `kill` wait for a block (polling the ARC service when
-there is no node), but only after the payment's notice is written or the
+parent proves. An input the chain view shows spent by another transaction is
+a refusal, whatever arcade answered. `pay` and `kill` wait for a block
+(polling arcade, then the chain view), but only after the payment's notice is written or the
 sweep is recorded and posted; a wait that runs out keeps the coin spent and
 holds the change until a later command collects the proof. Under
 `proofs = wait`, a token whose wait runs out after it was sent continues as
-`async` would: saved and published unmined. `funding = wallet` still needs a node, because the wallet
-broadcasts through its own service.
+`async` would: saved and published unmined. `funding = wallet` reads the
+wallet's broadcasts from the chain view, because the wallet broadcasts through
+its own service.
 
 ## At the host
 
@@ -570,7 +576,7 @@ sequenceDiagram
   A->>D: resolve the address to an identity key
   D-->>A: the identity key
   Note over A: derive a destination under BRC-29 with a fresh prefix and suffix
-  A->>N: settle an ordinary payment and wait for its proof, from the node or the ARC service
+  A->>N: settle an ordinary payment and wait for its proof, from the broadcaster or the chain view
   A->>A: write the notice a messagebox would carry (SEAM)
   A->>B: hand the notice over out of band
   B->>B: check the protocol, the addressee, the BEEF and the txid

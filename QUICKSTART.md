@@ -69,19 +69,30 @@ imported 1 output(s), 10000 sat, mined at height 912430; wallet 1 output(s), 100
 ```
 
 bfinger checks the payment's proof against the headers before it counts it.
+If your wallet hands you the payment as BEEF (a file, binary or hex), import
+that instead: it needs no lookup and no wait for the block. The container
+reads it on standard input, so run it with `-i` and without `-t`:
+
+```console
+$ docker run --rm -i -v bfinger:/home/nonroot/.bfinger -e BFINGER_HEADER_URL=woc:main \
+    ghcr.io/lightwebinc/bfinger fund -beef - < payment.beef
+```
+
+An unmined payment is held until a later command collects its proof.
 
 **Point it at a host and publish.** Records are kept by overlay hosts:
 servers that admit transactions for a topic and answer questions about
 them. bfinger's topic is `tm_finger`, and the host you publish to is your
 *facade*. Use any host that carries `tm_finger`, or your own (with none
-yet, do step 3 first and come back). The mined part goes to miners through
-a public ARC service (the transaction API miners run; `arcade:` names one):
+yet, do step 3 first and come back). No node is needed: the mined part goes
+to miners through GorillaPool's public arcade, and proofs are read from
+WhatsOnChain and checked against your headers. Both are settings
+(`settle`, `chain`) you can point at your own node:
 
 ```console
 $ alias bfinger='docker run --rm -it -v bfinger:/home/nonroot/.bfinger \
     -e BFINGER_HEADER_URL=woc:main \
     -e BFINGER_FACADE=https://finger.example.com \
-    -e BFINGER_SETTLE=arcade:https://arc.gorillapool.io/v1 \
     -e BFINGER_PROOFS=async \
     ghcr.io/lightwebinc/bfinger'
 $ bfinger create alice@example.com -set status="hello, world" -yes
@@ -126,4 +137,4 @@ $ bfinger alice@example.com -v
 - [docs/self-host.md](docs/self-host.md): running hosts, catching up from peers
 - [docs/examples.md](docs/examples.md): a working example for every command,
   starting with live mainnet commands, testnet, and a local regtest sandbox
-- Stuck? `bfinger doctor` reports your identity, wallet, header source, facade and settlement leg.
+- Stuck? `bfinger doctor` reports your identity, wallet, header source, chain view, facade, settlement leg and fee.

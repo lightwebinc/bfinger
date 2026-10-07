@@ -135,21 +135,22 @@ $ bfinger -header-url woc:main alice@example.com -v
 
 ## 4. Publish
 
-With your own host as the facade and an ARC service settling, publishing needs
-no node. Put the settings in `bfinger.env` (in a config file they are the same
+With your own host as the facade, publishing needs no node: transactions go to
+the public arcade and proofs are read from WhatsOnChain unless you name your
+own (`settle`, `chain`). Put the settings in `bfinger.env` (in a config file they are the same
 keys in lower case without `BFINGER_`, see
 [configuration.md](configuration.md#keys)):
 
 ```
 BFINGER_HEADER_URL=woc:main
 BFINGER_FACADE=https://finger.example.com
-BFINGER_SETTLE=arcade:https://arc.example.com/v1
 BFINGER_PROOFS=async
 ```
 
-`FACADE` is the host's base URL (bfinger posts to its `/submit`). `SETTLE`
-names any ARC-compatible API (`BFINGER_ARCADE_KEY` holds a bearer token if it
-wants one). `PROOFS=async` returns once the network accepts a transaction and
+`FACADE` is the host's base URL (bfinger posts to its `/submit`).
+`BFINGER_SETTLE=arcade:https://arcade.example.com` names your own arcade, or
+`arc:<url>` an ARC installation (`BFINGER_ARCADE_KEY` holds a bearer token if
+it wants one). `PROOFS=async` returns once the network accepts a transaction and
 collects the proof later, which is what a ten-minute block needs.
 
 ```console
@@ -162,5 +163,7 @@ $ bfinger create alice@example.com -set status=available -yes
 `init` prints the identity key and the fund address. Pay the fund address
 from any wallet; once that transaction is mined, `fund -txid` imports its
 outputs to the fund address after checking its proof against the header
-source. The [user guide](user-guide.md#8-publishing-your-own) covers `status`,
+source. A wallet that hands over the payment as BEEF needs no wait:
+`fund -beef -` reads it on standard input (run the container with `-i` and
+without `-t`). The [user guide](user-guide.md#8-publishing-your-own) covers `status`,
 `rotate` and the rest.

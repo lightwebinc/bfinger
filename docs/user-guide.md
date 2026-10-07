@@ -44,9 +44,7 @@ identity. Keep credentials in an env file, not on the command line:
 $ cat bfinger.env
 BFINGER_HEADER_URL=woc:main
 BFINGER_FACADE=https://finger.example.com
-BFINGER_SETTLE=arcade:https://arc.example.com/v1
-BFINGER_PROOFS=async
-BFINGER_ARCADE_KEY=change-me
+BFINGER_WOC_KEY=change-me
 $ alias bfinger='docker run --rm -i -t --env-file bfinger.env \
     -v bfinger-state:/home/nonroot/.bfinger ghcr.io/lightwebinc/bfinger:<tag>'
 $ bfinger alice@example.com
@@ -83,7 +81,7 @@ One `key = value` per line, `#` for a comment line, nothing else. It is found
 at `-config`, else `$BFINGER_HOME/config`, else
 `$XDG_CONFIG_HOME/bfinger/config`, else `~/.bfinger/config`. Flags beat the
 environment (`BFINGER_` plus the uppercased key), which beats the file, which
-beats the default. The twenty keys are in
+beats the default. The thirty-one keys are in
 [configuration.md](configuration.md#keys). What trips people up:
 
 - **A misspelt key is fatal** (exit 2) for every command except `-version`,
@@ -97,10 +95,10 @@ beats the default. The twenty keys are in
   [configuration.md](configuration.md#the-config-file).
 
 `bfinger doctor` shows what all this resolved to: identity, wallet, publishing
-state, pin store, header source, node (when `asset` is set), facade and
-settlement leg (when `facade` is set), and journal. It contacts the header
-source, the node, an `arcade:` leg and a wire wallet, and exits 0 whatever it
-finds, so never branch a script on it.
+state, pin store, header source, node (when one is configured), chain view,
+facade, settlement leg, fee policy and journal. It contacts the header source,
+the node, an `arcade:` or `arc:` leg, a live fee policy and a wire wallet, and
+exits 0 whatever it finds, so never branch a script on it.
 
 ## 4. Your first lookup
 
@@ -379,36 +377,42 @@ the config) is then required:
 spend real funds. None sends anything without `-yes`: the transition is built,
 `no -yes given: building only, sending nothing` is printed, and it is
 discarded. Under `funding = wallet` a missing `-yes`, or `-dry-run`, is
-refused instead (exit 2), because a wallet broadcasts what it signs. `init`, `fund -txid`, `doctor`,
-`receive`, `publish -resume`, `serve-wallet` and `domain-docs` spend nothing.
-`fund` without `-txid` mines coinbase on your own node at once (coinbase:
-only on a regtest chain you run, for development and tests).
+refused instead (exit 2), because a wallet broadcasts what it signs. `init`, `fund -txid`, `fund -beef`,
+`doctor`, `receive`, `publish -resume`, `serve-wallet` and `domain-docs` spend
+nothing. `fund` without `-txid` or `-beef` mines coinbase on your own node at
+once (coinbase: only on a regtest chain you run, for development and tests).
 
 **What publishing needs**, beyond `header_url`: `facade` (an overlay submit
-endpoint; a host's own `/submit` works) and `settle`: `arcade:<url>` for any
-ARC service, `rpc:<url>` for a node that acknowledges, or `tcp:<host:port>`
-for bare-EF ingress. A node (`rpc` and `asset`) is needed too, except with
-`settle = arcade:`, `proofs = async` and `funding = home`, where the tip comes
-from the header source and proofs from the ARC service. That node-free setup is the one
+endpoint; a host's own `/submit` works) and coin in the wallet. **No node is
+needed.** On mainnet and testnet the chain tip comes from the header source,
+transactions and proofs from WhatsOnChain (`chain`), and the broadcast goes to
+GorillaPool's public arcade (`settle`). Install, `init`, pay the fund address
+from your wallet (or hand over its BEEF), `fund`, publish. That is the setup
 [QUICKSTART.md](../QUICKSTART.md) uses:
 
 ```
 header_url = woc:main
 facade     = https://finger.example.com
-settle     = arcade:https://arc.gorillapool.io/v1
-proofs     = async
 ```
 
-**What it costs.** bfinger pays miners one satoshi per byte with a 250
-satoshi floor, above the 100 satoshis per 1,000 bytes that mainnet ARC
-services ask today. An update's token transaction is under 500 bytes, so an
-update costs a few hundred satoshis; the first record also mines a funding
-tree holding one funding output for each of the next 16 carriers. About 10,000 satoshis covers the
-first record and many updates. Nothing is charged for a lookup.
+Every backend is a setting, and a node of your own is the stronger choice:
+`chain = asset:<url>` reads from it, and `settle = rpc:<url>` broadcasts
+through it. `settle` also takes your own arcade (`arcade:<url>`), an ARC
+installation (`arc:<url>`) or bare-EF ingress (`tcp:<host:port>`); the
+tables are in [configuration.md](configuration.md#chain-views).
 
-**Testnet.** Set `network = test`, `header_url = woc:test` and a testnet ARC
-(`settle = arcade:https://testnet.arc.gorillapool.io/v1`). `init` then prints
-a testnet fund address, and `fund -txid` reads the payment from WhatsOnChain's
+**What it costs.** bfinger pays miners the network's rate, 100 satoshis per
+1,000 bytes, with a 250 satoshi floor per transaction. An update's token
+transaction is under 500 bytes, so an update pays the 250 satoshi floor; the
+first record also mines a funding tree holding one funding output for each of
+the next 16 carriers. About 10,000 satoshis covers the first record and many
+updates. Nothing is charged for a lookup. `fee_rate`, `fee_floor` and
+`fee_source = arc` (the broadcaster's live policy) change it:
+[configuration.md](configuration.md#miner-fees).
+
+**Testnet.** Set `network = test` and `header_url = woc:test`; the chain view
+and the broadcaster follow (`woc:test`, `arcade:test`). `init` then prints a
+testnet fund address, and `fund -txid` reads the payment from WhatsOnChain's
 testnet API. No public host carries `tm_finger` on testnet, so run one with
 `HEADERS=woc:test` ([self-host.md](self-host.md)) and use it as both `facade`
 and `-host`.
@@ -457,6 +461,7 @@ publishing: `identity.json` is the identity, `wallet.json` the coin, and
 flowchart LR
   W["any BSV wallet or exchange"] -->|"send to the fund address"| T["mined transaction"]
   T -->|"bfinger fund -txid"| H["coin in this home"]
+  W -->|"the payment's BEEF: bfinger fund -beef"| H
   P["another bfinger user"] -->|"pay, then receive the notice"| H
   N["regtest node you run (development only)"] -->|"bfinger fund -blocks 101 (coinbase)"| H
 ```
@@ -471,9 +476,24 @@ imported 1 output(s), 10000 sat, mined at height 912430; wallet 1 output(s), 100
 
 This imports the transaction's outputs that pay the fund address, after
 verifying its proof against your header source. The transaction comes from
-your node's asset API when `asset` is set, else from WhatsOnChain (`main` and
-`test` only). An unmined transaction is refused (`not mined yet`), a repeat
-says `already imported`, and one paying nothing to this home is refused.
+the chain view: WhatsOnChain by default, your node with `chain = asset:<url>`.
+An unmined transaction is refused (`not mined yet`), a repeat says
+`already imported`, and one paying nothing to this home is refused.
+
+**From a wallet that hands over BEEF.** A wallet that gives you the payment
+as BEEF (binary or hex) needs no lookup at all, and no wait for the block:
+
+```console
+$ bfinger fund -beef payment.beef
+imported 1 output(s), 10000 sat, not mined yet: held until its proof is collected by a later command; wallet 1 output(s), 10000 sat
+```
+
+A mined payment's proof is checked against your header source. One not mined
+yet is taken when every transaction it spends carries a proof your header
+source holds and it verifies against them; its coin is held until a later
+command collects its proof, then spent like any other. `-unmined refuse`, or
+`fund_unmined = refuse`, takes only a mined payment. `-beef -` reads standard
+input.
 
 No wallet yet? BRC-100 wallets such as BSV Desktop or BSV Browser can send to
 the fund address. They do not connect to bfinger: `wallet = wire` needs a
@@ -530,13 +550,12 @@ identity is a second home, for example a config naming
 By default a transition returns once its token is mined. To return in seconds:
 
 ```
-settle = arcade:https://arc.example.com/v1
 proofs = async
 ```
 
-The ARC service checks policy and reports acceptance; a refusal stops the
-transition before anything is published. `arcade_key` is sent as a bearer
-token. The result block then reads `token <txid> (accepted, proof pending)`,
+The broadcaster (an `arcade:` or `arc:` leg, the default) checks policy and
+reports acceptance; a refusal stops the transition before anything is
+published. `arcade_key` is sent to it as a bearer token. The result block then reads `token <txid> (accepted, proof pending)`,
 and readers see `VERIFIED-UNMINED` (a lookup exits 0, `verify` 1). The proof
 is collected by your next transition sent with `-yes`, or by
 `bfinger publish -resume`; other commands do not collect it. Collecting
@@ -657,15 +676,16 @@ An identity key is a payment root, so any directory entry is payable:
 `bfinger pay alice@example.com 1000 -yes` (an address or identity key, then a
 positive amount in satoshis) derives a BRC-29 destination from the recipient's
 key with a fresh prefix and suffix, pays it, waits for it to be mined (asking
-the ARC service when there is no node), and writes a **notice** to
+the broadcaster, then the chain view), and writes a **notice** to
 `~/.bfinger/payments/<txid>.json`: sender key, derivation, txid, output, and
 the BEEF with its proof. It resolves the recipient before reading your node
 settings, so a bad address fails as a resolution error. Deliver the notice by
 any means.
 
 The notice is written as soon as the payment is sent, and rewritten with the
-proof once it mines. The wait is bounded (ten minutes from a node, an hour
-from an ARC service, since public blocks can be slow); if it runs out, `pay`
+proof once it mines. The wait is bounded (an hour through an `arcade:` or
+`arc:` leg, since public blocks can be slow; ten minutes through `rpc:` or
+`tcp:`); if it runs out, `pay`
 still succeeds and reports `sent, proof pending`, the notice stays valid
 (`receive` fetches the proof by txid once the payment has a block), and the
 change is held until a later command collects its proof.
@@ -694,8 +714,10 @@ is funded by the wallet and `receive` hands the payment to the wallet
 | `REFUSED-KEY ... names a different identity than the domain resolved` | Usually a rotation without the domain edit, 1. | Update the resolve answer. |
 | `REFUSED-KEY ... no rotation signed by the pinned key names it` | Key changed without a rotation you can follow, 1. | Check out of band; `keys trust -force`. |
 | `manifest for example.com: ... status 404` | No `/manifest.json`, 2. | Publish one; the path is fixed. |
-| `rpc and asset must be configured for owner commands` | No node and not the node-free setup, 2. | Set `rpc` and `asset`, or `settle = arcade:` with `proofs = async`. |
-| `... pays nothing to this home's fund address ...` | `fund -txid` on the wrong transaction, 2. | Check the txid and fund address. |
+| `rpc and asset must be configured for coinbase funding` | `fund` with neither `-txid` nor `-beef`, which mines on a regtest node, 2. | Use `fund -txid` or `fund -beef`. |
+| `settle must be configured on network regtest` | A private chain has no public broadcaster, 2. | Set `settle`. |
+| `... pays nothing to this home's fund address ...` | `fund -txid` or `fund -beef` on the wrong transaction, 2. | Check the txid and fund address. |
+| `... not mined yet; import it once it has a block, or hand over the wallet's BEEF with fund -beef` | `fund -txid` before the block, or `fund -beef -unmined refuse`, 2. | Wait for the block, or use `fund -beef`. |
 | `the topic manager admitted nothing` | The facade took the POST, the host admitted nothing, 2. | Check the host's logs. |
 
 ## 12. Where to go next

@@ -27,6 +27,12 @@ $ bfinger -header-url woc:main 1bsv@lightweb.net -field status
 
 That is a live mainnet address; run it as written.
 
+Publishing your own needs **no node and no server of your own**: install,
+`bfinger init`, pay the fund address it prints from your wallet (or hand over
+the payment's BEEF), `bfinger fund`, publish. Public services carry the
+rest (WhatsOnChain, a public broadcaster), and every one is a setting you can
+point at your own node instead.
+
 **New here? Start with [QUICKSTART.md](QUICKSTART.md).**
 
 ## How it works
