@@ -32,7 +32,7 @@ func TestGoldenTokens(t *testing.T) {
 	}
 	// Fee: inputs minus outputs, at least the floor and at least size*rate.
 	fee := funding.Outputs[2].Satoshis - t1.TotalOutputSatoshis()
-	if fee < mint.DefaultFees.Floor || fee < uint64(t1.Size()) {
+	if fee < mint.LegacyFees.Floor || fee < uint64(t1.Size()) {
 		t.Fatalf("token1 fee %d under policy (size %d)", fee, t1.Size())
 	}
 
@@ -62,7 +62,7 @@ func TestFundingTree(t *testing.T) {
 		t.Fatal(err)
 	}
 	fee := mint.Input{Tx: funding, Vout: 2, Unlocker: token.RecordUnlocker(ctx, w, "bfinger")}
-	tree, err := mint.FundingTree(ctx, w, "bfinger", 8, 1, fee, change, mint.DefaultFees)
+	tree, err := mint.FundingTree(ctx, w, "bfinger", 8, 1, fee, change, mint.LegacyFees)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestFundingTree(t *testing.T) {
 
 	// Insufficient funds are refused, not silently under-paid.
 	small := mint.Input{Tx: funding, Vout: 0, Unlocker: token.RecordUnlocker(ctx, w, "bfinger")}
-	if _, err := mint.FundingTree(ctx, w, "bfinger", 8, 1, small, change, mint.DefaultFees); !errors.Is(err, mint.ErrInsufficient) {
+	if _, err := mint.FundingTree(ctx, w, "bfinger", 8, 1, small, change, mint.LegacyFees); !errors.Is(err, mint.ErrInsufficient) {
 		t.Fatalf("one satoshi funded a tree: %v", err)
 	}
 }
@@ -126,12 +126,12 @@ func TestFeeConverges(t *testing.T) {
 		funding.AddOutput(&transaction.TransactionOutput{Satoshis: 3000 + uint64(i)*137, LockingScript: change})
 		fee := mint.Input{Tx: funding, Vout: 0, Unlocker: token.RecordUnlocker(ctx, w, "bfinger")}
 		c := goldentest.Fill(byte(i + 1))
-		tx, err := mint.Token(ctx, w, "bfinger", c, &mint.Input{Tx: t1, Vout: 0}, fee, change, mint.DefaultFees)
+		tx, err := mint.Token(ctx, w, "bfinger", c, &mint.Input{Tx: t1, Vout: 0}, fee, change, mint.LegacyFees)
 		if err != nil {
 			t.Fatalf("mint %d: %v", i, err)
 		}
 		paid := funding.Outputs[0].Satoshis + t1.Outputs[0].Satoshis - tx.TotalOutputSatoshis()
-		if paid < mint.DefaultFees.Floor || paid < uint64(tx.Size()) {
+		if paid < mint.LegacyFees.Floor || paid < uint64(tx.Size()) {
 			t.Fatalf("mint %d paid %d for %d bytes", i, paid, tx.Size())
 		}
 	}

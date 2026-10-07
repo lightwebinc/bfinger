@@ -148,7 +148,7 @@ func (f *fixture) token(w wallet.Interface, c [32]byte, prev *transaction.Transa
 		}
 	}
 	change, _ := carrier.FundingLock(f.ctx, w, orig)
-	tx, err := mint.Token(f.ctx, w, orig, c, p, mint.Input{Tx: f.funding, Vout: feeVout, Unlocker: token.RecordUnlocker(f.ctx, f.w1, orig)}, change, mint.DefaultFees)
+	tx, err := mint.Token(f.ctx, w, orig, c, p, mint.Input{Tx: f.funding, Vout: feeVout, Unlocker: token.RecordUnlocker(f.ctx, f.w1, orig)}, change, mint.LegacyFees)
 	if err != nil {
 		f.t.Fatal(err)
 	}

@@ -93,7 +93,7 @@ func Generate(t *testing.T) *goldentest.Golden {
 	}
 	C1 := carrier.Commitment(c1)
 	recordUnlock := token.RecordUnlocker(ctx, w, orig)
-	t1, err := mint.Token(ctx, w, orig, C1, nil, mint.Input{Tx: funding, Vout: 2, Unlocker: recordUnlock}, fundLock, mint.DefaultFees)
+	t1, err := mint.Token(ctx, w, orig, C1, nil, mint.Input{Tx: funding, Vout: 2, Unlocker: recordUnlock}, fundLock, mint.LegacyFees)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func Generate(t *testing.T) *goldentest.Golden {
 	}
 	C2 := carrier.Commitment(c2)
 	t2, err := mint.Token(ctx, w, orig, C2, &mint.Input{Tx: t1, Vout: 0},
-		mint.Input{Tx: funding, Vout: 3, Unlocker: recordUnlock}, fundLock, mint.DefaultFees)
+		mint.Input{Tx: funding, Vout: 3, Unlocker: recordUnlock}, fundLock, mint.LegacyFees)
 	if err != nil {
 		t.Fatal(err)
 	}

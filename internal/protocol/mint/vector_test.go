@@ -94,7 +94,7 @@ func generateMintVector(t *testing.T) *mintVector {
 		t.Fatal(err)
 	}
 	unlock := token.RecordUnlocker(ctx, w, orig)
-	fees := mint.DefaultFees
+	fees := mint.LegacyFees
 	v := &mintVector{
 		FundingTxid:     funding.TxID().String(),
 		SatPerByte:      fees.SatPerByte,

@@ -108,7 +108,7 @@ func TestWireSignsATreeAndACarrier(t *testing.T) {
 	parent.AddOutput(&transaction.TransactionOutput{Satoshis: 100_000, LockingScript: lock})
 	fee := mint.Input{Tx: parent, Vout: 0, Unlocker: token.RecordUnlocker(ctx, w, "bfinger.example.com")}
 
-	tree, err := mint.FundingTree(ctx, w, "bfinger.example.com", 4, 1, fee, lock, mint.DefaultFees)
+	tree, err := mint.FundingTree(ctx, w, "bfinger.example.com", 4, 1, fee, lock, mint.LegacyFees)
 	if err != nil {
 		t.Fatalf("funding tree over the wire: %v", err)
 	}

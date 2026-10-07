@@ -31,6 +31,9 @@ func TestAdapterSharesLibrary(t *testing.T) {
 	if mint.DefaultFees != bcmint.DefaultFees {
 		t.Fatalf("default fees %+v, library %+v", mint.DefaultFees, bcmint.DefaultFees)
 	}
+	if mint.LegacyFees != bcmint.LegacyFees {
+		t.Fatalf("legacy fees %+v, library %+v", mint.LegacyFees, bcmint.LegacyFees)
+	}
 }
 
 // The wrappers derive the lock through the wallet before the library sees
@@ -39,15 +42,15 @@ func TestAdapterSharesLibrary(t *testing.T) {
 // wallet's refusal comes before a missing change script.
 func TestAdapterCheckOrder(t *testing.T) {
 	ctx := context.Background()
-	_, err := mint.FundingTree(ctx, nil, "bfinger", 0, 1, mint.Input{}, nil, mint.DefaultFees)
+	_, err := mint.FundingTree(ctx, nil, "bfinger", 0, 1, mint.Input{}, nil, mint.LegacyFees)
 	if want := "mint: a funding tree needs at least one output of at least one satoshi"; err == nil || err.Error() != want {
 		t.Fatalf("tree with no outputs and no wallet: %v, want %q", err, want)
 	}
-	_, err = mint.FundingTree(ctx, nil, "bfinger", 1, 1, mint.Input{}, nil, mint.DefaultFees)
+	_, err = mint.FundingTree(ctx, nil, "bfinger", 1, 1, mint.Input{}, nil, mint.LegacyFees)
 	if want := "pushdrop: nil wallet"; err == nil || err.Error() != want {
 		t.Fatalf("tree with no wallet and no change: %v, want %q", err, want)
 	}
-	_, err = mint.Token(ctx, nil, "bfinger", goldentest.Fill(1), nil, mint.Input{}, nil, mint.DefaultFees)
+	_, err = mint.Token(ctx, nil, "bfinger", goldentest.Fill(1), nil, mint.Input{}, nil, mint.LegacyFees)
 	if want := "token: nil wallet"; err == nil || err.Error() != want {
 		t.Fatalf("token with no wallet and no change: %v, want %q", err, want)
 	}
@@ -69,7 +72,7 @@ func TestTokenLeavesPrevAsHandedIn(t *testing.T) {
 	}
 	prev := &mint.Input{Tx: goldentest.Tx(t, g.Token1TxHex), Vout: 0}
 	fee := mint.Input{Tx: g.Funding(t), Vout: 3, Unlocker: token.RecordUnlocker(ctx, w, "bfinger")}
-	if _, err := mint.Token(ctx, w, "bfinger", goldentest.Fill(9), prev, fee, change, mint.DefaultFees); err != nil {
+	if _, err := mint.Token(ctx, w, "bfinger", goldentest.Fill(9), prev, fee, change, mint.LegacyFees); err != nil {
 		t.Fatal(err)
 	}
 	if prev.Unlocker != nil {
@@ -77,9 +80,9 @@ func TestTokenLeavesPrevAsHandedIn(t *testing.T) {
 	}
 }
 
-// The wrappers hand the caller's fee policy to the library as it is. The
-// command and every other test mint at DefaultFees, so a wrapper that
-// swapped its fees for the default would pass them all. Under one policy
+// The wrappers hand the caller's fee policy to the library as it is. Every
+// other test mints at LegacyFees, so a wrapper that swapped its fees for a
+// named policy would pass them all. Under one policy
 // whose rate governs and one whose floor governs, each wrapper's result must
 // be the library's byte for byte, given the lock finger derives and the
 // unlocker it defaults to, and must pay that policy rather than the default.
@@ -209,11 +212,11 @@ func TestTokenKeepsCallerUnlocker(t *testing.T) {
 		return &mint.Input{Tx: t1, Vout: 0, Unlocker: u}
 	}
 
-	got, err := mint.Token(ctx, b, orig, c, prev(token.Unlocker(ctx, a, orig)), fee(), change, mint.DefaultFees)
+	got, err := mint.Token(ctx, b, orig, c, prev(token.Unlocker(ctx, a, orig)), fee(), change, mint.LegacyFees)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want, err := bcmint.Transition(lock, token.Satoshis, prev(token.Unlocker(ctx, a, orig)), fee(), change, mint.DefaultFees)
+	want, err := bcmint.Transition(lock, token.Satoshis, prev(token.Unlocker(ctx, a, orig)), fee(), change, mint.LegacyFees)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +230,7 @@ func TestTokenKeepsCallerUnlocker(t *testing.T) {
 	// The default is the successor's key, which cannot spend the
 	// predecessor's token: the interpreter, not this test's arithmetic, is
 	// what tells the two unlockers apart.
-	wrong, err := mint.Token(ctx, b, orig, c, prev(nil), fee(), change, mint.DefaultFees)
+	wrong, err := mint.Token(ctx, b, orig, c, prev(nil), fee(), change, mint.LegacyFees)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -289,10 +292,10 @@ func TestAdapterPassesContext(t *testing.T) {
 		build func() (*transaction.Transaction, error)
 	}{
 		{"token update", func() (*transaction.Transaction, error) {
-			return mint.Token(ctx, w, orig, goldentest.Fill(9), prev, fee, change, mint.DefaultFees)
+			return mint.Token(ctx, w, orig, goldentest.Fill(9), prev, fee, change, mint.LegacyFees)
 		}},
 		{"funding tree", func() (*transaction.Transaction, error) {
-			return mint.FundingTree(ctx, w, orig, 8, 1, fee, change, mint.DefaultFees)
+			return mint.FundingTree(ctx, w, orig, 8, 1, fee, change, mint.LegacyFees)
 		}},
 	} {
 		w.calls, w.untagged = 0, 0
@@ -362,14 +365,14 @@ func TestAdapterPassesOriginator(t *testing.T) {
 			calls []string
 		}{
 			{"token create", func() (*transaction.Transaction, error) {
-				return mint.Token(ctx, w, orig, goldentest.Fill(9), nil, fee, change, mint.DefaultFees)
+				return mint.Token(ctx, w, orig, goldentest.Fill(9), nil, fee, change, mint.LegacyFees)
 			}, []string{"key", "sign data"}},
 			{"token update", func() (*transaction.Transaction, error) {
 				prev := &mint.Input{Tx: goldentest.Tx(t, g.Token1TxHex), Vout: 0}
-				return mint.Token(ctx, w, orig, goldentest.Fill(9), prev, fee, change, mint.DefaultFees)
+				return mint.Token(ctx, w, orig, goldentest.Fill(9), prev, fee, change, mint.LegacyFees)
 			}, []string{"key", "sign data", "sign hash"}},
 			{"funding tree", func() (*transaction.Transaction, error) {
-				return mint.FundingTree(ctx, w, orig, 8, 1, fee, change, mint.DefaultFees)
+				return mint.FundingTree(ctx, w, orig, 8, 1, fee, change, mint.LegacyFees)
 			}, []string{"key"}},
 		} {
 			w.seen = nil

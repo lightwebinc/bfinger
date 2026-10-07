@@ -63,7 +63,7 @@ func (f *fixture) unminedToken(c [32]byte, feeW wallet.Interface) *transaction.T
 		f.t.Fatal(err)
 	}
 	tx, err := mint.Token(f.ctx, f.w1, orig, c, nil,
-		mint.Input{Tx: f.funding, Vout: 2, Unlocker: token.RecordUnlocker(f.ctx, feeW, orig)}, change, mint.DefaultFees)
+		mint.Input{Tx: f.funding, Vout: 2, Unlocker: token.RecordUnlocker(f.ctx, feeW, orig)}, change, mint.LegacyFees)
 	if err != nil {
 		f.t.Fatal(err)
 	}

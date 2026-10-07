@@ -28,12 +28,18 @@ import (
 // transaction, the output index, and the template that signs it.
 type Input = bcmint.Input
 
-// Fees is the fee policy: a rate per byte and a floor under it.
+// Fees is the fee policy: a rate (satoshis per bytes), a floor under it and
+// the guards over it.
 type Fees = bcmint.Fees
 
-// DefaultFees is one satoshi per byte with a 250 satoshi floor, the policy a
-// private chain's load generator already mints under.
+// DefaultFees is the network's rate, 100 satoshis per 1000 bytes, with a 250
+// satoshi floor: what a real transaction pays unless configured otherwise.
 var DefaultFees = bcmint.DefaultFees
+
+// LegacyFees is one satoshi per byte with a 250 satoshi floor, the default
+// before the network rate. The test vectors and goldens are built with it,
+// so a change of default never moves a pinned byte.
+var LegacyFees = bcmint.LegacyFees
 
 // The library's sentinels, the same values, so errors.Is matches either name.
 var (
