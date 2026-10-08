@@ -16,12 +16,12 @@ A Bitcoin-era descendant of the UNIX `finger` command. Ask what
 itself, instead of one you trust because of who handed it over.
 
 ```console
-$ bfinger -header-url woc:main 1bsv@lightweb.net -yes | head -4
+$ bfinger 1bsv@lightweb.net -yes | head -4
 1bsv@lightweb.net
   VERIFIED   signature, sequence 2 (update), proof at height 968974
   key        03dd1a…3902  (pinned 2026-10-07 (first contact))
   org        Lightweb Inc.
-$ bfinger -header-url woc:main 1bsv@lightweb.net -field status
+$ bfinger 1bsv@lightweb.net -field status
 1971 called; the .plan is back.
 ```
 
@@ -78,7 +78,7 @@ worked example in the pattern paper
 
 | | |
 | --- | --- |
-| Container | `docker run --rm -it ghcr.io/lightwebinc/bfinger -header-url woc:main alice@example.com` (linux/amd64, linux/arm64) |
+| Container | `docker run --rm -it ghcr.io/lightwebinc/bfinger alice@example.com` (linux/amd64, linux/arm64) |
 | Binary | [Releases](https://github.com/lightwebinc/bfinger/releases): static builds for Linux and macOS, amd64 and arm64, with `SHA256SUMS` |
 | Go | `go install github.com/lightwebinc/bfinger/cmd/bfinger@latest` (Go 1.27.1 or later) |
 | A host of your own | `HOST=finger.example.com docker compose up -d` with the release's `compose.yaml` ([docs/self-host.md](docs/self-host.md)), or one CloudFormation stack on AWS ([deploy/aws](deploy/aws/README.md)) |

@@ -100,8 +100,9 @@ any reader pointed at it.
 The reader and the host check every proof against a header source; the
 publisher uses one to check imported coin and every proof the chain view
 answers, and for the chain tip.
-There is no default (`header_url` is required for anything that prints
-`VERIFIED`).
+The default is the public WhatsOnChain service on the network (`woc:main`,
+`woc:test`); regtest has none, and there `header_url` is required for anything
+that prints `VERIFIED`. An explicit `header_url` always wins.
 
 | `header_url` | What it is | Checked how |
 | --- | --- | --- |
@@ -220,7 +221,7 @@ route. The notice the payee needs is a local file, delivered out of band
 
 | Flow | Who pays | Cost |
 | --- | --- | --- |
-| Settlement | the publisher | miner fee at the network's rate, 100 satoshis per 1,000 bytes, 250 satoshi floor |
+| Settlement | the publisher | miner fee at the network's rate, 100 satoshis per 1,000 bytes, 100 satoshi floor |
 | Proof | the publisher | a query to the leg or WhatsOnChain (free at 3 a second), or a node the publisher runs or rents |
 | Object leg | nobody | one POST per object |
 | Multicast fan-out | each receiving host, on a metered network | delivered bytes |
@@ -234,7 +235,7 @@ Measured on the published test vector ([testdata/golden](../testdata/golden)):
 the create token is 327 bytes and pays 330 satoshis, an update token 440 bytes
 and 446, a kill sweep 398 bytes and 405, at the legacy rate the vectors pin,
 about 1 satoshi a byte (250 at least); at the default network rate each pays
-the 250 satoshi floor. The carrier pays nothing. On the
+the 100 satoshi floor (327 to 440 bytes is 33 to 44 satoshis at the rate). The carrier pays nothing. On the
 network, one update transition is 1954 bytes: 823 for the carrier's Atomic BEEF
 and 1131 for the token's. The publisher pays miners and nobody else; delivery
 is metered where it arrives. A verified lookup of the test vector makes two

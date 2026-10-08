@@ -13,14 +13,16 @@ value never hides a configured one. Eleven of the thirty-one keys have a global
 flag; the rest are set only in the file or the environment, which keeps
 credentials such as `rpc_pass`, `arcade_key` and `woc_key` off command lines.
 
-`header_url`, `host` and `facade` have **no default**. Each is the address of
-somebody's deployment, and `header_url` is the egress control: a default would
-send verification questions to a server nobody chose. A reader needs only
-`header_url`; on mainnet the shortest working value is `woc:main`.
+`header_url` defaults to the public WhatsOnChain service on the network
+(`woc:main` on mainnet, `woc:test` on testnet); regtest has no default. An
+explicit `header_url` always wins, and every header is checked for its proof
+of work whatever the source. `host` and `facade` have **no default**: each is
+the address of somebody's deployment. A reader on mainnet needs no setting at
+all.
 
 **No node is needed** on mainnet or testnet. The chain view (`chain`) defaults
 to WhatsOnChain and the settlement leg (`settle`) to GorillaPool's public
-arcade, so a publisher sets `header_url` and `facade`, pays its fund address
+arcade, so a publisher sets `facade`, pays its fund address
 from any wallet, and imports the payment with `fund`. A node of your own is
 the stronger option for both, and every backend is a setting.
 
@@ -75,7 +77,7 @@ settlement leg and fee policy.
 | --- | --- | --- | --- |
 | `home` | `-home` | `~/.bfinger` | the state directory: pin store, identity, wallet, state, journal |
 | `host` | `-host` | none | the overlay host to look up at. Unset, the domain's manifest names it (`ls_finger`). Required to look up by identity key |
-| `header_url` | `-header-url` | none | the header source every proof is checked against (see [Header sources](#header-sources)). Needed by lookups, `verify`, `keys verify`, `receive`, `fund -txid`, and a publisher without a node |
+| `header_url` | `-header-url` | `woc:<network>` on `main` and `test`; none on `regtest` | the header source every proof is checked against (see [Header sources](#header-sources)). Needed by lookups, `verify`, `keys verify`, `receive`, `fund -txid`, and a publisher without a node |
 | `network` | none | `main` | `main`, `test` or `regtest` (any private chain). Sets the proof-of-work floor and the fund address prefix. A `woc:` source must name the same network |
 | `known_keys` | `-known-keys` | `<home>/known_keys` | the pin store ([format](known-keys.md)) |
 | `quorum` | `-quorum` | `1` | lookups: how many hosts must answer identically ([host selection](host-selection.md)) |
@@ -89,10 +91,10 @@ settlement leg and fee policy.
 | `fund_unmined` | none | `accept` | `fund -beef`: `accept` takes a payment not mined yet whose parents are proven, held until its proof arrives; `refuse` takes only a mined one. `fund -unmined` overrides it for one run |
 | `fee_rate` | `-fee-rate` | `100/1000` | the miner fee, satoshis per bytes (`SATS/BYTES`, or a whole number of satoshis a byte), see [Miner fees](#miner-fees) |
 | `fee_source` | `-fee-source` | `static` | `static`: `fee_rate`. `arc`: the policy the broadcaster publishes, live |
-| `fee_floor` | `-fee-floor` | `250` | the least fee one transaction pays, satoshis |
-| `fee_dust` | none | `250` | the least change kept as an output; less goes to the fee |
+| `fee_floor` | `-fee-floor` | `100` | the least fee one transaction pays, satoshis |
+| `fee_dust` | none | `100` | the least change kept as an output; less goes to the fee |
 | `fee_min_rate` | none | `100/1000` | `fee_source = arc`: the least rate a live policy may lower to |
-| `fee_max_rate` | `-fee-max-rate` | none; `1/1` under `fee_source = arc` | a cap on the rate, static or live |
+| `fee_max_rate` | `-fee-max-rate` | `100/1000`, the network rate | a cap on the rate: a static `fee_rate` above it is lowered to it, and a broadcaster's policy above it refuses the transaction until you raise it |
 | `fee_max_tx` | none | `0`, none | the most one transaction may pay; a fee above it is refused, not paid |
 | `fee_policy_urls` | none | the `arcade:` or `arc:` leg | `fee_source = arc`: comma-separated broadcaster URLs asked for their policy; the highest rate wins |
 | `rpc` | none | none | a node's JSON-RPC URL: coinbase funding only (a regtest chain you run) |
@@ -157,13 +159,14 @@ A value written before these defaults, such as
 
 A transaction pays `ceil(size * SATS / BYTES)` satoshis, at least
 `fee_floor`. The default is the network's rate, `100/1000` (100 satoshis a
-kilobyte), with a 250 satoshi floor, so a small record update pays the floor.
+kilobyte), with a 100 satoshi floor, so a small record update pays the floor.
 The kill switch's sweep pays by the same policy.
 
 `fee_source = arc` asks the broadcaster for the fee policy it publishes
 (ARC's policy endpoint, which arcade answers too) every five minutes, held between `fee_min_rate` and
-`fee_max_rate` (default `1/1`, ten times the network rate), so an endpoint
-that fails or lies cannot raise the fee without bound. With no
+`fee_max_rate` (default `100/1000`, the network rate, so bfinger never
+overpays; a broadcaster asking more is refused until you raise it), so an endpoint
+that fails or lies cannot raise the fee. With no
 `fee_policy_urls` it asks the `arcade:` or `arc:` leg itself. A policy that
 cannot be fetched falls back to the last good answer for a day, then to
 `fee_rate`. `doctor` shows which is in force.
@@ -209,13 +212,13 @@ the same command.
 | `-config PATH` | see [The config file](#the-config-file) | |
 | `-home DIR` | `~/.bfinger` | key `home` |
 | `-host URL` | the domain's manifest | key `host` |
-| `-header-url SOURCE` | none | key `header_url` |
+| `-header-url SOURCE` | `woc:<network>` (none on regtest) | key `header_url` |
 | `-known-keys PATH` | `<home>/known_keys` | key `known_keys` |
 | `-chain SPEC` | `woc:<network>` | key `chain` |
 | `-fee-rate S/B` | `100/1000` | key `fee_rate` |
 | `-fee-source SRC` | `static` | key `fee_source` |
-| `-fee-floor N` | `250` | key `fee_floor` |
-| `-fee-max-rate S/B` | none | key `fee_max_rate` |
+| `-fee-floor N` | `100` | key `fee_floor` |
+| `-fee-max-rate S/B` | `100/1000` | key `fee_max_rate` |
 | `-quorum N` | `1` | key `quorum` |
 | `-timeout DUR` | `15s` | key `timeout` |
 | `-v` | `false` | print every verification step on stderr |

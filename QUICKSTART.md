@@ -15,7 +15,7 @@ flowchart LR
 
 ```console
 $ alias bfinger='docker run --rm -it -v bfinger:/home/nonroot/.bfinger \
-    -e BFINGER_HEADER_URL=woc:main ghcr.io/lightwebinc/bfinger'
+    ghcr.io/lightwebinc/bfinger'
 $ bfinger 1bsv@lightweb.net -ansi
 ```
 
@@ -30,8 +30,8 @@ rotated to). The first line of the answer is what matters:
 | `VERIFIED-UNMINED` | All checked, but the latest update is not in a block yet |
 | anything else (`REFUSED-...`, `NO-TOKEN`, ...) | Something did not check out, or there is no record; nothing from the host is printed as true |
 
-`-header-url woc:main` (set above through `BFINGER_HEADER_URL`) is where the
-block headers come from. bfinger checks the proof of work of every header,
+The block headers come from `woc:main` (public WhatsOnChain) by default;
+`-header-url` names another source. bfinger checks the proof of work of every header,
 so the source cannot lie without mining a block. Other choices:
 [header sources](docs/configuration.md#header-sources).
 
@@ -74,7 +74,7 @@ that instead: it needs no lookup and no wait for the block. The container
 reads it on standard input, so run it with `-i` and without `-t`:
 
 ```console
-$ docker run --rm -i -v bfinger:/home/nonroot/.bfinger -e BFINGER_HEADER_URL=woc:main \
+$ docker run --rm -i -v bfinger:/home/nonroot/.bfinger \
     ghcr.io/lightwebinc/bfinger fund -beef - < payment.beef
 ```
 
@@ -91,7 +91,6 @@ WhatsOnChain and checked against your headers. Both are settings
 
 ```console
 $ alias bfinger='docker run --rm -it -v bfinger:/home/nonroot/.bfinger \
-    -e BFINGER_HEADER_URL=woc:main \
     -e BFINGER_FACADE=https://finger.example.com \
     -e BFINGER_PROOFS=async \
     ghcr.io/lightwebinc/bfinger'

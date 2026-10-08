@@ -32,8 +32,8 @@ type Input = bcmint.Input
 // the guards over it.
 type Fees = bcmint.Fees
 
-// DefaultFees is the network's rate, 100 satoshis per 1000 bytes, with a 250
-// satoshi floor: what a real transaction pays unless configured otherwise.
+// DefaultFees is the network's rate, 100 satoshis per 1000 bytes, with a 100
+// satoshi floor and a 100/1000 cap: what a real transaction pays unless configured otherwise.
 var DefaultFees = bcmint.DefaultFees
 
 // LegacyFees is one satoshi per byte with a 250 satoshi floor, the default

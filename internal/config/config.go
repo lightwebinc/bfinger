@@ -32,8 +32,8 @@ type Config struct {
 	// from the domain's manifest (BRC-180).
 	Host string
 	// HeaderURL is the header source: woc:main, woc:test, chaintracks:URL, or
-	// a bridge's header read API base. Required for anything that can print
-	// VERIFIED; no default, ever.
+	// a bridge's header read API base. Empty resolves to WhatsOnChain on the
+	// network (woc:main, woc:test; see DefaultHeaderURL); regtest has none.
 	HeaderURL string
 	// Network is the chain: "main" (the default), "test" or "regtest" (any
 	// private chain). It sets the proof-of-work floor a header must meet.
@@ -122,6 +122,29 @@ func Defaults() Config {
 // setting at its default with no sign that the file was ever read.
 var Keys = []string{"home", "host", "header_url", "network", "facade", "settle", "rpc", "rpc_user", "rpc_pass", "asset", "topic", "known_keys", "timeout", "quorum", "originator", "wallet", "wallet_url", "funding", "proofs", "arcade_key",
 	"chain", "woc_key", "fund_unmined", "fee_rate", "fee_source", "fee_floor", "fee_dust", "fee_min_rate", "fee_max_rate", "fee_max_tx", "fee_policy_urls"}
+
+// DefaultHeaderURL is the header source used when none is set: the public
+// WhatsOnChain service for main and test, and none for regtest (a private
+// chain has no public header service).
+func DefaultHeaderURL(network string) string {
+	switch network {
+	case "main":
+		return "woc:main"
+	case "test":
+		return "woc:test"
+	}
+	return ""
+}
+
+// Resolve fills the settings whose default depends on others: an unset
+// header_url becomes DefaultHeaderURL(Network). Call it once, after the file,
+// environment and flags are applied, so an explicit header_url wins.
+func (c Config) Resolve() Config {
+	if c.HeaderURL == "" {
+		c.HeaderURL = DefaultHeaderURL(c.Network)
+	}
+	return c
+}
 
 // ErrUnknownKey reports a key the grammar does not define.
 var ErrUnknownKey = errors.New("config: unknown key")

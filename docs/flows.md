@@ -57,8 +57,8 @@ minimum, no environment proxy, same-origin redirects, 256 KiB bodies.
 
 ```mermaid
 flowchart TD
-  CFG["header_url"] --> SET{"set"}
-  SET -->|"no"| U["usage error, exit 2, before any request"]
+  CFG["header_url"] --> SET{"set, or defaulted to woc:network"}
+  SET -->|"no (regtest only)"| U["usage error, exit 2, before any request"]
   SET -->|"yes"| P{"its form"}
   P -->|"woc:main or woc:test"| W{"matches the network key"}
   W -->|"no"| U
@@ -389,7 +389,7 @@ sequenceDiagram
   participant S as Header source
   participant A as Arcade
   participant F as Facade and hosts
-  Note over B: settle and chain at their defaults, proofs = async, header_url set, no rpc or asset
+  Note over B: settle, chain and header_url at their defaults, proofs = async, no rpc or asset
   B->>S: the chain tip
   B->>A: GET /tx/TXID for each kept transaction still unproven
   A-->>B: MINED with a merkle path, pending, or REJECTED
@@ -602,7 +602,8 @@ flowchart TD
   PN["the reader's own pin store"] -->|"the key it saw last time"| R
 ```
 
-The reader believes only headers from a source it chose and a pin it wrote,
-which is why `header_url` has no default. The pin bounds a domain that starts
+The reader believes only headers from a configured source (WhatsOnChain on
+the network unless `header_url` says otherwise), each checked for its proof of
+work, and a pin it wrote; never headers from whoever answered the lookup. The pin bounds a domain that starts
 answering a different key. SPV cannot say whether an output is spent, so a
 reader with no host it trusts cannot see a kill (SEAM).

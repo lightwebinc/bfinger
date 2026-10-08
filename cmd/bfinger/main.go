@@ -73,14 +73,14 @@ global flags:
   -home DIR           state directory (default ~/.bfinger)
   -host URL           overlay host base for lookups (default: the domain's manifest)
   -header-url SOURCE  header source: woc:main, woc:test, chaintracks:URL or a
-                      bridge URL; REQUIRED for VERIFIED, no default
+                      bridge URL (default woc:<network>; none on regtest)
   -known-keys PATH    pin store (default ~/.bfinger/known_keys)
   -chain SPEC         chain view: woc:main, woc:test, asset:URL (a node), or a
                       list (default woc:<network>, or asset:<asset key>)
   -fee-rate S/B       miner fee rate, satoshis per bytes (default 100/1000)
   -fee-source SRC     static (the rate above) or arc (the broadcaster's policy)
-  -fee-floor N        least fee a transaction pays, satoshis (default 250)
-  -fee-max-rate S/B   cap on the rate, static or live (a live policy: 1/1)
+  -fee-floor N        least fee a transaction pays, satoshis (default 100)
+  -fee-max-rate S/B   cap on the rate (default 100/1000, the network rate)
   -quorum N           hosts that must answer identically (default 1)
   -timeout DUR        per request (default 15s)
   -v                  verbose: print every verification step
@@ -225,6 +225,7 @@ func run(args []string, stdout, stderr *os.File) int {
 		fmt.Fprintln(stderr, "bfinger:", err)
 		return 2
 	}
+	cfg = cfg.Resolve()
 	if err := checkHeaderSource(cfg.HeaderURL, cfg.Network); err != nil {
 		fmt.Fprintln(stderr, "bfinger:", err)
 		return 2

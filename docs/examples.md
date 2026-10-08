@@ -14,19 +14,19 @@ address whose domain names its own host, so a reader needs only a header
 source. Heights, sequence numbers and dates move as the record is updated.
 
 ```console
-$ bfinger -header-url woc:main 1bsv@lightweb.net -yes | head -4
+$ bfinger 1bsv@lightweb.net -yes | head -4
 1bsv@lightweb.net
   VERIFIED   signature, sequence 2 (update), proof at height 968974
   key        03dd1a…3902  (pinned 2026-10-07 (first contact))
   org        Lightweb Inc.
-$ bfinger -header-url woc:main 1bsv@lightweb.net -field status
+$ bfinger 1bsv@lightweb.net -field status
 1971 called; the .plan is back.
-$ bfinger -header-url woc:main verify 1bsv@lightweb.net 2>&1 >/dev/null | tail -4   # the trace is on stderr
+$ bfinger verify 1bsv@lightweb.net 2>&1 >/dev/null | tail -4   # the trace is on stderr
    ok   pin          matches
    ok   chain        prev 328fe3df65603327e00ca17d871ae5fac75674b7fffb393b64d4089d91abc5c9 seq 1 witness ok
    ok   window       inside
    ok   VERIFIED
-$ bfinger -header-url woc:main -json 1bsv@lightweb.net | jq -r '.code, .height'
+$ bfinger -json 1bsv@lightweb.net | jq -r '.code, .height'
 VERIFIED
 968974
 $ bfinger keys list
@@ -34,8 +34,8 @@ $ bfinger keys list
 ```
 
 `-yes` pins the key on first contact without a prompt; leave it off to be
-asked. Put `header_url = woc:main` in the config file (or export
-`BFINGER_HEADER_URL=woc:main`) to drop the flag.
+asked. The header source defaults to `woc:main` on mainnet; set `header_url`
+(or `-header-url`) to use another.
 
 **Publishing on mainnet** needs no node and no server of your own, only coin
 you already own. The chain view defaults to WhatsOnChain (`chain = woc:main`)
@@ -60,8 +60,8 @@ $ bfinger publish -resume             # later: collects the proofs async left pe
 ```
 
 bfinger pays the network's miner fee, 100 satoshis per 1,000 bytes, with a
-250 satoshi floor per transaction. An update's token is under 500 bytes (the
-live record's latest is 458), so an update pays the floor, and the first
+100 satoshi floor per transaction. An update's token is under 500 bytes (the
+live record's latest is 458, 46 satoshis at the rate), so an update pays the floor, and the first
 record also mines a funding tree holding one funding output for each of the
 next 16 carriers. Ten thousand satoshis covers the first record and many
 updates. Example 26 has the output.
@@ -109,8 +109,8 @@ rpc        = http://192.0.2.10:8332
 asset      = http://192.0.2.10:8090
 ```
 
-`header_url`, `host` and `facade` have no default. A reader needs
-`header_url` alone: the domain's manifest names the host (traces say
+`host` and `facade` have no default; `header_url` defaults to `woc:<network>`
+(none on regtest). A reader on mainnet needs no setting: the domain's manifest names the host (traces say
 `(manifest)`). Set `host` for a lookup by key or a domain with no `ls_finger`.
 
 ### Header sources and `network`
@@ -419,8 +419,8 @@ locale is not UTF-8.
 ## 11. The header source: missing, behind, lying
 
 ```console
-$ bfinger -config /dev/null alice@example.com
-bfinger: no -header-url configured; VERIFIED needs a header source and there is no default (for mainnet: -header-url woc:main)
+$ BFINGER_NETWORK=regtest bfinger -config /dev/null alice@example.com
+bfinger: no -header-url configured; VERIFIED needs a header source and regtest has no default (set -header-url to your chain's header source)
 $ bfinger alice@example.com        # the source is behind the proof's block: exit 1
 alice@example.com
   REFUSED-BUMP token proof at height 912430 is not in the header source
@@ -428,7 +428,8 @@ $ bfinger alice@example.com        # the source failed or lied: no verdict, exit
 bfinger: could not verify: token proof could not be checked: headers: header fails its proof of work: height 912430: bits 207fffff claim less work than the network floor
 ```
 
-The first is checked before any network call; `-header-url ""` does not unset
+The first (regtest only; mainnet and testnet default to WhatsOnChain) is
+checked before any network call; `-header-url ""` does not unset
 a configured source, since a flag at its zero value never hides the file. A
 source is behind when it answers 404 for the height. Any other status but
 200, or a header without the work it claims, is a failure.
@@ -907,7 +908,7 @@ node        http://192.0.2.10:8090 tip 912451
 chain       asset:http://192.0.2.10:8090
 facade      https://finger.example.com
 settle      tcp:192.0.2.20:8000, proofs wait
-fees        100/1000 sat/bytes, floor 250 (static)
+fees        100/1000 sat/bytes, floor 100 (static)
 journal     seq 8 update 1111111111111111111111111111111111111111111111111111111111111111 ok
 ```
 
@@ -915,7 +916,7 @@ Other lines, when they apply:
 
 | Line | When |
 | --- | --- |
-| `state       never published`, `headers     NOT CONFIGURED (no VERIFIED possible)` | a fresh home; no `header_url` |
+| `state       never published`, `headers     NOT CONFIGURED (regtest has no default; no VERIFIED possible)` | regtest with no `header_url` |
 | `wallet      absent (<error>)` | no identity in the home |
 | `wire wallet <url>` | `wallet = wire` |
 | `rotation    PENDING to <key>; publish one transition to complete it` | a rotation awaits completion |

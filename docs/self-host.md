@@ -22,7 +22,7 @@ flowchart LR
 
 ```console
 $ docker run --rm -it -v bfinger:/home/nonroot/.bfinger \
-    ghcr.io/lightwebinc/bfinger -header-url woc:main alice@example.com -ansi
+    ghcr.io/lightwebinc/bfinger alice@example.com -ansi
 ```
 
 The volume keeps the pin store, so a second lookup checks the key against the
@@ -130,7 +130,7 @@ sequenceDiagram
 Check from anywhere:
 
 ```console
-$ bfinger -header-url woc:main alice@example.com -v
+$ bfinger alice@example.com -v
 ```
 
 ## 4. Publish
@@ -142,7 +142,6 @@ keys in lower case without `BFINGER_`, see
 [configuration.md](configuration.md#keys)):
 
 ```
-BFINGER_HEADER_URL=woc:main
 BFINGER_FACADE=https://finger.example.com
 BFINGER_PROOFS=async
 ```

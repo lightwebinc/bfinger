@@ -5,7 +5,8 @@ leaves on disk. The transitions as diagrams are [flows.md](flows.md) 8 to 13;
 the reader's side is [committed-record.md](committed-record.md) section 10;
 every flag is in [configuration.md](configuration.md).
 
-Reading needs only `header_url`. Publishing also needs a submit endpoint
+Reading needs no setting (`header_url` defaults to WhatsOnChain on the
+network). Publishing needs a submit endpoint
 (`facade`) and coin in the wallet; neither has a default. It needs no node:
 on mainnet and testnet the settlement leg (`settle`) defaults to the public
 arcade and the chain view (`chain`) to WhatsOnChain
@@ -101,7 +102,7 @@ the order and what each step leaves behind.
 3. **Record, carrier, token.** The carrier spends the next funding output at
    fee zero; its txid is `C`. The token spends the previous token (updates
    only) and one fee input, at the network's rate (`fee_rate`, 100 satoshis
-   per 1,000 bytes by default) with a 250 satoshi floor.
+   per 1,000 bytes by default) with a 100 satoshi floor.
 4. **Journal entry**, then the settlement leg (`arcade:` by default, `arc:`,
    `rpc:` or `tcp:`).
    `proofs = wait` waits for the proof; `async` goes on once the leg reports

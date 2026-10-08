@@ -1825,7 +1825,7 @@ func cmdDoctor(ctx context.Context, g *global, args []string, stdout, stderr *os
 		fmt.Fprintf(stdout, "known_keys  %d line(s) in %s\n", len(recs), g.cfg.KnownKeys)
 	}
 	if g.cfg.HeaderURL == "" {
-		fmt.Fprintln(stdout, "headers     NOT CONFIGURED (no VERIFIED possible)")
+		fmt.Fprintln(stdout, "headers     NOT CONFIGURED (regtest has no default; no VERIFIED possible)")
 	} else {
 		h := g.headers()
 		h.Timeout = g.cfg.Timeout

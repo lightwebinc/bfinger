@@ -42,7 +42,6 @@ identity. Keep credentials in an env file, not on the command line:
 
 ```console
 $ cat bfinger.env
-BFINGER_HEADER_URL=woc:main
 BFINGER_FACADE=https://finger.example.com
 BFINGER_WOC_KEY=change-me
 $ alias bfinger='docker run --rm -i -t --env-file bfinger.env \
@@ -59,14 +58,15 @@ pass `-yes`. Bind mounts, addresses seen from inside the container and
 ### The header source
 
 `header_url` (`-header-url`) is where this reader gets the block headers it
-checks proofs against. There is no default: headers from whoever answered the
-lookup would verify nothing, and a built-in default would send every
-verification question to a party nobody chose. Without one a lookup stops at
-exit 2, before any network call:
+checks proofs against. It defaults to the public WhatsOnChain service on the
+network (`woc:main` on mainnet, `woc:test` on testnet); an explicit value
+always wins. Headers never come from whoever answered the lookup, and every
+header must carry its proof of work. Regtest has no default; without one a
+regtest lookup stops at exit 2, before any network call:
 
 ```console
-$ bfinger alice@example.com
-bfinger: no -header-url configured; VERIFIED needs a header source and there is no default (for mainnet: -header-url woc:main)
+$ BFINGER_NETWORK=regtest bfinger -config /dev/null alice@example.com
+bfinger: no -header-url configured; VERIFIED needs a header source and regtest has no default (set -header-url to your chain's header source)
 ```
 
 Sources are `woc:main` or `woc:test` (public WhatsOnChain),
@@ -102,11 +102,11 @@ exits 0 whatever it finds, so never branch a script on it.
 
 ## 4. Your first lookup
 
-`bfinger -header-url woc:main alice@example.com` runs the chain below. To
+`bfinger alice@example.com` runs the chain below. To
 try it on a live mainnet address now:
 
 ```console
-$ bfinger -header-url woc:main 1bsv@lightweb.net
+$ bfinger 1bsv@lightweb.net
 ```
 
 **Where flags go.** Global flags (`-config`, `-home`, `-host`, `-header-url`,
@@ -402,15 +402,15 @@ installation (`arc:<url>`) or bare-EF ingress (`tcp:<host:port>`); the
 tables are in [configuration.md](configuration.md#chain-views).
 
 **What it costs.** bfinger pays miners the network's rate, 100 satoshis per
-1,000 bytes, with a 250 satoshi floor per transaction. An update's token
-transaction is under 500 bytes, so an update pays the 250 satoshi floor; the
+1,000 bytes, with a 100 satoshi floor per transaction. An update's token
+transaction is under 1,000 bytes, so an update pays the 100 satoshi floor; the
 first record also mines a funding tree holding one funding output for each of
 the next 16 carriers. About 10,000 satoshis covers the first record and many
 updates. Nothing is charged for a lookup. `fee_rate`, `fee_floor` and
 `fee_source = arc` (the broadcaster's live policy) change it:
 [configuration.md](configuration.md#miner-fees).
 
-**Testnet.** Set `network = test` and `header_url = woc:test`; the chain view
+**Testnet.** Set `network = test` (`header_url` follows: `woc:test`); the chain view
 and the broadcaster follow (`woc:test`, `arcade:test`). `init` then prints a
 testnet fund address, and `fund -txid` reads the payment from WhatsOnChain's
 testnet API. No public host carries `tm_finger` on testnet, so run one with

@@ -29,8 +29,9 @@ a matching signature. The whole order, with every outcome, is
 [flows.md 4](flows.md#4-verification-order).
 
 **Where headers come from is a security question.** A reader that takes
-headers from whoever answered the lookup has verified nothing, so `header_url`
-has no default and a run without it stops before any connection. A bridge
+headers from whoever answered the lookup has verified nothing, so headers come
+only from `header_url` (WhatsOnChain on the network by default; regtest has
+none, and a regtest run without one stops before any connection). A bridge
 that received headers off the same network is the strongest source; a public
 WhatsOnChain or chaintracks source is accepted because each header must carry
 its proof of work, at a mainnet floor of difficulty 4e9
@@ -64,7 +65,7 @@ The file's grammar is in [known-keys.md](known-keys.md).
 ```
 cmd/bfinger/        the command, and nothing else
 internal/
-  config/           settings; header_url, host and facade have no default, chain and settle default to public services
+  config/           settings; host and facade have no default; header_url, chain and settle default to public services
   goldentest/       the shared vector's reader
   protocol/         bfinger's formats: record, token, carrier, mint
   reader/           lookup questions, the reader's algorithm, the pin file

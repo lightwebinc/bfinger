@@ -386,7 +386,7 @@ func (g *global) discoveryClient() *http.Client {
 // host, lookup, quorum comparison, verification against the pin.
 func resolveAndVerify(ctx context.Context, g *global, acctArg string, stderr *os.File) (*lookupResult, error) {
 	if g.cfg.HeaderURL == "" {
-		return nil, usage("no -header-url configured; VERIFIED needs a header source and there is no default (for mainnet: -header-url woc:main)")
+		return nil, usage("no -header-url configured; VERIFIED needs a header source and regtest has no default (set -header-url to your chain's header source)")
 	}
 	var (
 		lr       *lookupResult

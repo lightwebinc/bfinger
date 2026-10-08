@@ -104,3 +104,31 @@ func TestFeeKeys(t *testing.T) {
 		}
 	}
 }
+
+// TestHeaderURLDefault: an unset header_url resolves to WhatsOnChain on the
+// network, regtest has none, and an explicit one wins on any network.
+func TestHeaderURLDefault(t *testing.T) {
+	for _, tc := range []struct{ network, explicit, want string }{
+		{"main", "", "woc:main"},
+		{"test", "", "woc:test"},
+		{"regtest", "", ""},
+		{"main", "chaintracks:https://headers.example", "chaintracks:https://headers.example"},
+		{"test", "woc:main", "woc:main"},
+		{"regtest", "https://bridge.example", "https://bridge.example"},
+	} {
+		vals := map[string]string{"network": tc.network}
+		if tc.explicit != "" {
+			vals["header_url"] = tc.explicit
+		}
+		c, err := Defaults().Apply(vals)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := c.Resolve().HeaderURL; got != tc.want {
+			t.Errorf("network %s explicit %q: header_url %q, want %q", tc.network, tc.explicit, got, tc.want)
+		}
+	}
+	if Defaults().HeaderURL != "" {
+		t.Error("Defaults sets header_url before the network is known")
+	}
+}
