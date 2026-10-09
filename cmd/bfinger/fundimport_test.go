@@ -79,6 +79,14 @@ func assetServing(t *testing.T, txs ...*transaction.Transaction) string {
 			case "/api/v1/merkle_proof/" + id:
 				_, _ = w.Write(tx.MerklePath.Bytes())
 				return
+			case "/api/v1/utxos/" + id + "/json":
+				// Every output unspent: the import asks before it adds one.
+				outs := make([]map[string]any, len(tx.Outputs))
+				for i := range tx.Outputs {
+					outs[i] = map[string]any{"txid": id, "vout": i, "status": "OK"}
+				}
+				_ = json.NewEncoder(w).Encode(outs)
+				return
 			}
 		}
 		http.NotFound(w, r)
