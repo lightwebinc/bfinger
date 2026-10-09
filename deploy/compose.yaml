@@ -21,7 +21,7 @@ name: finger
 
 services:
   db:
-    image: mysql:9@sha256:30a0abfa7b502a496e12339b54cd07aaa70363396dc4b8e8a72a92804a505cd6
+    image: mysql:9@sha256:e2bde46db6563855d7177adb5f0b57b9dc663f5a20927a90f4259d3312068497
     environment:
       MYSQL_DATABASE: overlay
       MYSQL_USER: overlay
@@ -54,7 +54,7 @@ services:
     restart: unless-stopped
 
   caddy:
-    image: caddy:2@sha256:0c994536bddb66445885237f1a5dcc1916bccea922661c76b4e9fc24061f9b52
+    image: caddy:2@sha256:f2a1290d0463aad60660d4ec134943f183ee2a5f6c3eb7bf32dd984f2f020772
     depends_on:
       - host
     ports:
