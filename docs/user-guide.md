@@ -26,7 +26,7 @@ answer. Sections 2 to 7 cover reading, 8 to 10 publishing, with one binary.
   `SHA256SUMS`. The license files travel inside the tarball.
 - **Container image**: `ghcr.io/lightwebinc/bfinger:<tag>`, distroless,
   `nonroot`, `linux/amd64` and `linux/arm64`.
-- **With Go** (1.27.1 or later):
+- **With Go** (1.27.2 or later):
   `go install github.com/lightwebinc/bfinger/cmd/bfinger@latest`, or
   `go build ./cmd/bfinger` in a clone. The only direct dependencies are
   go-sdk and `github.com/lightwebinc/bcommon`, both pinned.

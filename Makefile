@@ -173,7 +173,7 @@ docker-smoke: docker-build
 	echo "== -h"; run -h 2>&1 | head -1; \
 	echo "== init"; run init; \
 	echo "== doctor"; out=$$(run doctor); echo "$$out"; \
-	echo "$$out" | grep -q '^headers     NOT CONFIGURED' || { echo "docker-smoke: doctor output unexpected"; exit 1; }; \
+	echo "$$out" | grep -q '^headers     woc:main' || { echo "docker-smoke: doctor output unexpected"; exit 1; }; \
 	echo "== keys trust"; run keys trust alice@example.com -key $(SMOKE_KEY) -fingerprint $(SMOKE_FP); \
 	echo "== keys list"; run keys list | grep -F "fp=$(SMOKE_FP)"; \
 	echo "== a lookup with no header source exits 2 before any request"; \
