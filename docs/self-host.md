@@ -52,7 +52,7 @@ put `HOST=finger.example.com` in a `.env` file beside `compose.yaml`.
 | Service | What it is |
 | --- | --- |
 | `host` | `ghcr.io/lightwebinc/finger-host`: the reference overlay host with `tm_finger` and `ls_finger` built in. It admits records, answers lookups, and checks every proof against its header source |
-| `db` | MySQL, the host's storage, reachable only inside the project's network |
+| `db` | MySQL 26, the host's storage, reachable only inside the project's network |
 | `caddy` | TLS for `HOST` (certificate fetched on first start), the handle resolve endpoint, `manifest.json`, and CORS so a web page can read the host. `/admin/*` and `/metrics` answer 404 from outside |
 
 Settings, all optional except `HOST`:
@@ -65,6 +65,7 @@ Settings, all optional except `HOST`:
 | `ADMIN_TOKEN` | random per start | bearer token for `/admin` |
 | `SYNC_PEERS` | none | hosts to catch up from, `tm_finger=https://other-host.example.net` |
 | `DB_PASSWORD` | a fixed internal value | the database is reachable only from the host container |
+| `DB_BUFFER_POOL` | `128M` | MySQL's InnoDB buffer pool, sized for a 1 GiB host; raise it on a bigger one |
 | `FINGER_HOST_IMAGE` | this release's `finger-host` (`latest` in the repository copy) | the image to run |
 
 ### Catching up from another host
@@ -84,8 +85,9 @@ $ docker compose exec host node -e 'fetch("http://localhost:8080/admin/startGASP
 ```
 
 `"no-peers"` means `OVERLAY_SYNC_PEERS` did not reach the host. The peer sends
-the current state of every identity, not its history; the host rebuilds each
-chain from what it received without a restart (see
+unspent outputs only: every carrier, but only each identity's current token.
+After the resulting `no-current` refusals settle, `ls_finger` rebuilds each
+chain from its index without a restart (see
 [host/README.md](../host/README.md#restore-and-catch-up)).
 
 ## 3. Make your domain answer
