@@ -70,6 +70,11 @@ flowchart TD
   OUTS -->|"no"| E4["error naming the fund address"]
   OUTS -->|"yes"| ADD["add them to wallet.json with the transaction and its proof"]
   ADD --> SAY["imported, or already imported: exit 0"]
+  %% The last node is an invisible spacer in the rightmost rank: the rendered
+  %% viewer places its zoom and pan controls over the bottom-right corner.
+  ADD ~~~ pad
+  pad["&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;"]:::pad
+  classDef pad fill:none,stroke:none,color:transparent
 ```
 
 Every failure exits 2. The source is never trusted: its answer must be the

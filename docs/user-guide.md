@@ -130,6 +130,11 @@ flowchart LR
   I["header source"] --> H
   H --> J["POST base/lookup for each linked store"]
   J --> K["VERIFIED, or a refusal code"]
+  %% The last node is an invisible spacer in the rightmost rank: the rendered
+  %% viewer places its zoom and pan controls over the bottom-right corner.
+  J ~~~ pad
+  pad["&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;"]:::pad
+  classDef pad fill:none,stroke:none,color:transparent
 ```
 
 A run contacts the domain's manifest, the resolve endpoint it names (or
@@ -230,6 +235,11 @@ flowchart TD
   F --> G["sequence advances, previous carrier, witness"]
   G --> H["validity window is open"]
   H --> I["VERIFIED"]
+  %% The last node is an invisible spacer in the rightmost rank: the rendered
+  %% viewer places its zoom and pan controls over the bottom-right corner.
+  H ~~~ pad
+  pad["&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;"]:::pad
+  classDef pad fill:none,stroke:none,color:transparent
 ```
 
 A non-`output-list` answer exits 2: it made no claim that could be false.
@@ -464,6 +474,11 @@ flowchart LR
   W -->|"the payment's BEEF: bfinger fund -beef"| H
   P["another bfinger user"] -->|"pay, then receive the notice"| H
   N["regtest node you run (development only)"] -->|"bfinger fund -blocks 101 (coinbase)"| H
+  %% The last node is an invisible spacer in the rightmost rank: the rendered
+  %% viewer places its zoom and pan controls over the bottom-right corner.
+  T ~~~ pad
+  pad["&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;"]:::pad
+  classDef pad fill:none,stroke:none,color:transparent
 ```
 
 **From any wallet.** Send BSV to the fund address `init` printed and, once it

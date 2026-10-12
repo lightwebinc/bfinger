@@ -63,6 +63,11 @@ flowchart LR
   dom -->|"identity key and host"| rdr
   h1 -->|"lookup answer"| rdr
   brx -->|"lookup answer"| rdr
+  %% The last node is an invisible spacer in the rightmost rank: the rendered
+  %% viewer places its zoom and pan controls over the bottom-right corner.
+  brx ~~~ pad
+  pad["&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;"]:::pad
+  classDef pad fill:none,stroke:none,color:transparent
 ```
 
 The publisher and the reader never talk to each other. Everything between

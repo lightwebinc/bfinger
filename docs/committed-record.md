@@ -45,6 +45,11 @@ flowchart RL
   O1 -.->|"holds C n-1"| K1
   O2 -.->|"holds C n"| K2
   K2 -.->|"S n.prev = C n-1"| K1
+  %% The last node is an invisible spacer in the rightmost rank: the rendered
+  %% viewer places its zoom and pan controls over the bottom-right corner.
+  pad ~~~ O1
+  pad["&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;"]:::pad
+  classDef pad fill:none,stroke:none,color:transparent
 ```
 
 Time runs left to right. Solid arrows are spends; dotted arrows are
@@ -212,6 +217,11 @@ flowchart RL
   S2 -->|"prev C1, reveals w1"| S1
   S3 -->|"prev C2, reveals w2"| S2
   S4 -->|"prev C3, reveals w3"| S3
+  %% The last node is an invisible spacer in the rightmost rank: the rendered
+  %% viewer places its zoom and pan controls over the bottom-right corner.
+  pad ~~~ S3
+  pad["&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;"]:::pad
+  classDef pad fill:none,stroke:none,color:transparent
 ```
 
 Arrows point from a record to the one it follows. `S1` to `S3` are funded

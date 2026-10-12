@@ -9,6 +9,11 @@ for step 2, a small amount of BSV.
 flowchart LR
   A["1. Read<br/>no setup"] --> B["2. Publish<br/>about 10,000 satoshis"]
   B --> C["3. Be findable<br/>a domain and a host"]
+  %% The last node is an invisible spacer in the rightmost rank: the rendered
+  %% viewer places its zoom and pan controls over the bottom-right corner.
+  B ~~~ pad
+  pad["&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;"]:::pad
+  classDef pad fill:none,stroke:none,color:transparent
 ```
 
 ## 1. Read an address

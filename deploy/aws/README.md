@@ -11,6 +11,11 @@ flowchart LR
   E --> I["t4g.micro<br/>caddy, finger-host, mysql"]
   O["operator"] -->|"SSH, port 22, from one address,<br/>or Session Manager"| I
   I -->|headers| W["header source<br/>woc:main"]
+  %% The last node is an invisible spacer in the rightmost rank: the rendered
+  %% viewer places its zoom and pan controls over the bottom-right corner.
+  I ~~~ pad
+  pad["&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;"]:::pad
+  classDef pad fill:none,stroke:none,color:transparent
 ```
 
 ## Deploy

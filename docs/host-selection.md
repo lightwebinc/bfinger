@@ -45,6 +45,11 @@ flowchart LR
   P -->|"answer, 4xx included"| Q{quorum met}
   Q -->|no| P
   Q -->|yes| C[compare bodies: agree or REFUSED-FORK]
+  %% The last node is an invisible spacer in the rightmost rank: the rendered
+  %% viewer places its zoom and pan controls over the bottom-right corner.
+  Q ~~~ pad
+  pad["&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;"]:::pad
+  classDef pad fill:none,stroke:none,color:transparent
 ```
 
 - **Resolve all addresses.** `hostset.DNS` returns every A and AAAA record; an

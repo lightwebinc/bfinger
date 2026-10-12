@@ -46,6 +46,11 @@ flowchart LR
   O["owner"] -->|publish| H
   O -->|one small tx per update| B[("BSV blockchain")]
   B -.-> S
+  %% The last node is an invisible spacer in the rightmost rank: the rendered
+  %% viewer places its zoom and pan controls over the bottom-right corner.
+  B ~~~ pad
+  pad["&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;<br/>&nbsp;"]:::pad
+  classDef pad fill:none,stroke:none,color:transparent
 ```
 
 - **The domain names the key.** `example.com` answers which identity key is
