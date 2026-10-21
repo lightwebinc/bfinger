@@ -46,7 +46,8 @@ reader flags:
 
 owner commands (the sending ones spend real funds and send nothing without
                 -yes; init, fund, doctor, receive, publish -resume,
-                domain-docs and serve-wallet do not):
+                domain-docs, serve-wallet, open, inbox and
+                grant -release-only do not):
   init                create the identity; print its key and fund address
   fund -txid TXID     import a mined payment you sent to the fund address
   fund -beef FILE|-   import a payment your wallet handed over as BEEF

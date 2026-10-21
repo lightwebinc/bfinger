@@ -38,12 +38,12 @@ const deliveryBox = "bfinger_private_store"
 // A variable so a test can stand in for the server.
 var newMessageBox = func(base string, w wallet.Interface) *messagebox.Client { return messagebox.New(base, w) }
 
-// sendDelivery hands a delivery to its reader's box on the message box at
+// sendDelivery hands a handoff to its reader's box on the message box at
 // base, under the delivery's hash as its message id, so sending it twice
 // is one message.
-func sendDelivery(ctx context.Context, g *global, base string, sg *bwallet.Signer, reader *ec.PublicKey, dv []byte, hash [32]byte) error {
+func sendDelivery(ctx context.Context, base string, sg *bwallet.Signer, reader *ec.PublicKey, handoff []byte, hash [32]byte) error {
 	mb := newMessageBox(base, sg)
-	if err := mb.Send(ctx, hex.EncodeToString(reader.Compressed()), deliveryBox, hex.EncodeToString(hash[:16]), base64.StdEncoding.EncodeToString(dv)); err != nil {
+	if err := mb.Send(ctx, hex.EncodeToString(reader.Compressed()), deliveryBox, hex.EncodeToString(hash[:16]), base64.StdEncoding.EncodeToString(handoff)); err != nil {
 		return fmt.Errorf("the delivery is written, and sending it failed: %w", err)
 	}
 	return nil
@@ -56,20 +56,24 @@ const (
 	deliveryDir = "deliveries"
 )
 
-const grantHelp = `usage: bfinger grant <store> <reader acct|identity key> [-release-only] [-out FILE]
+const grantHelp = `usage: bfinger grant <store> <reader acct|identity key> [-release-only] [-out FILE] [-messagebox URL] [-reader-data TEXT] [-yes]
 
 Grant one reader a private store this home published: its store key,
 encrypted to the reader and signed by this identity (the release), wrapped
-for one delivery by this home (the delivery). Hand the delivery file to the
-reader, who opens it with bfinger open. With -release-only the release is
-written alone, for a host to deliver with bfinger deliver. Spends nothing.`
+for one delivery by this home (the delivery) and anchored on chain by a
+transaction this home pays for. Hand the delivery file to the reader, or
+send it to their message box; they open it with bfinger open. With
+-release-only the release is written alone, for a host to deliver with
+bfinger deliver, and nothing is spent. The anchor spends real funds: without
+-yes nothing is sent.`
 
-const deliverHelp = `usage: bfinger deliver <release FILE> [-out FILE]
+const deliverHelp = `usage: bfinger deliver <release FILE> [-out FILE] [-messagebox URL] [-reader-data TEXT] [-yes]
 
 Wrap a release for the one reader it names: a delivery signed by this home's
-identity, with a nonce and the time, encrypted to the reader. This is the
-host's half of a private store's delivery; the release inside stays sealed to
-the reader. Spends nothing.`
+identity, with a nonce and the time, encrypted to the reader, and anchored on
+chain by a transaction this home pays for. This is the host's half of a
+private store's delivery; the release inside stays sealed to the reader. The
+anchor spends real funds: without -yes nothing is sent.`
 
 const openHelp = `usage: bfinger open <delivery FILE> [address] [reader flags]
 
@@ -114,6 +118,8 @@ func cmdGrant(ctx context.Context, g *global, args []string, stdout, stderr *os.
 	releaseOnly := fs.Bool("release-only", false, "write the release alone, for a host to deliver")
 	out := fs.String("out", "", "file to write (default under the home)")
 	box := fs.String("messagebox", g.cfg.MessageBox, "also send the delivery to the reader's box on this BRC-33 message box server")
+	yes := fs.Bool("yes", false, "mine the delivery's anchor and write the delivery; without it nothing is sent")
+	readerData := fs.String("reader-data", "", "what to commit to about the reader in the anchor, kept here with its salt, never on chain")
 	pos, err := collectPositional(fs, args)
 	if err != nil {
 		return err
@@ -172,25 +178,8 @@ func cmdGrant(ctx context.Context, g *global, args []string, stdout, stderr *os.
 		fmt.Fprintf(stdout, "release of %q for %s written to %s; a host delivers it with bfinger deliver\n", store.Name, label, path)
 		return nil
 	}
-	dv, hash, err := private.Deliver(ctx, sg, g.cfg.Originator, rel, time.Now())
-	if err != nil {
-		return err
-	}
-	path := *out
-	if path == "" {
-		path = filepath.Join(g.cfg.Home, deliveryDir, fmt.Sprintf("%s-%s-%x.bfd", store.Name, who, hash[:4]))
-	}
-	if err := writePrivateFile(path, dv); err != nil {
-		return err
-	}
-	fmt.Fprintf(stdout, "delivery of %q for %s written to %s; the reader opens it with bfinger open\n", store.Name, label, path)
-	if *box != "" {
-		if err := sendDelivery(ctx, g, *box, sg, reader, dv, hash); err != nil {
-			return err
-		}
-		fmt.Fprintf(stdout, "sent to %s's box at %s; the reader takes it with bfinger inbox\n", label, *box)
-	}
-	return nil
+	name := fmt.Sprintf("%s-%s", store.Name, who)
+	return deliverAnchored(ctx, g, rel, anchorOpts{out: *out, name: name, box: *box, yes: *yes, readerData: *readerData, label: label}, stdout, stderr)
 }
 
 func cmdDeliver(ctx context.Context, g *global, args []string, stdout, stderr *os.File) error {
@@ -201,6 +190,8 @@ func cmdDeliver(ctx context.Context, g *global, args []string, stdout, stderr *o
 	fs.SetOutput(stderr)
 	out := fs.String("out", "", "file to write (default under the home)")
 	box := fs.String("messagebox", g.cfg.MessageBox, "also send the delivery to the reader's box on this BRC-33 message box server")
+	yes := fs.Bool("yes", false, "mine the delivery's anchor and write the delivery; without it nothing is sent")
+	readerData := fs.String("reader-data", "", "what to commit to about the reader in the anchor, kept here with its salt, never on chain")
 	pos, err := collectPositional(fs, args)
 	if err != nil {
 		return err
@@ -216,29 +207,9 @@ func cmdDeliver(ctx context.Context, g *global, args []string, stdout, stderr *o
 	if err != nil {
 		return &exitError{1, err.Error()}
 	}
-	sg, _, err := g.signer(ctx)
-	if err != nil {
-		return err
-	}
-	dv, hash, err := private.Deliver(ctx, sg, g.cfg.Originator, rel, time.Now())
-	if err != nil {
-		return err
-	}
-	path := *out
-	if path == "" {
-		path = filepath.Join(g.cfg.Home, deliveryDir, fmt.Sprintf("%x-%x.bfd", info.Reader.Compressed()[:8], hash[:4]))
-	}
-	if err := writePrivateFile(path, dv); err != nil {
-		return err
-	}
-	fmt.Fprintf(stdout, "delivery for %s of content %x written to %s\n", abbrev(hex.EncodeToString(info.Reader.Compressed())), info.ContentID[:8], path)
-	if *box != "" {
-		if err := sendDelivery(ctx, g, *box, sg, info.Reader, dv, hash); err != nil {
-			return err
-		}
-		fmt.Fprintf(stdout, "sent to the reader's box at %s\n", *box)
-	}
-	return nil
+	name := fmt.Sprintf("%x", info.Reader.Compressed()[:8])
+	return deliverAnchored(ctx, g, rel, anchorOpts{out: *out, name: name, box: *box, yes: *yes, readerData: *readerData,
+		label: abbrev(hex.EncodeToString(info.Reader.Compressed()))}, stdout, stderr)
 }
 
 const inboxHelp = `usage: bfinger inbox [-messagebox URL]
@@ -278,7 +249,10 @@ func cmdInbox(ctx context.Context, g *global, args []string, stdout, stderr *os.
 	for _, m := range msgs {
 		dv, err := base64.StdEncoding.DecodeString(m.Body)
 		if err == nil {
-			_, err = private.OpenDelivery(ctx, sg, g.cfg.Originator, dv)
+			var h *private.Handoff
+			if h, err = private.DecodeHandoff(dv); err == nil {
+				_, err = private.OpenDelivery(ctx, sg, g.cfg.Originator, h.Delivery)
+			}
 		}
 		if err != nil {
 			fmt.Fprintf(stderr, "message %s from %s: not a delivery for this identity (%v); left in the box\n", safeLabel(m.MessageID), abbrev(m.Sender), err)
@@ -321,13 +295,20 @@ func cmdOpen(ctx context.Context, g *global, args []string, stdout, stderr *os.F
 	if err != nil {
 		return err
 	}
-	dv, err := private.OpenDelivery(ctx, sg, g.cfg.Originator, raw)
+	h, err := private.DecodeHandoff(raw)
+	if err != nil {
+		return &exitError{1, err.Error()}
+	}
+	dv, err := private.OpenDelivery(ctx, sg, g.cfg.Originator, h.Delivery)
 	if err != nil {
 		return &exitError{1, err.Error()}
 	}
 	k, info, err := private.OpenRelease(ctx, sg, g.cfg.Originator, dv.Release)
 	if err != nil {
 		return &exitError{1, err.Error()}
+	}
+	if err := checkAnchor(ctx, g, h, dv, info, stderr); err != nil {
+		return err
 	}
 	fmt.Fprintf(stderr, "delivered by %s at %s; granted by %s\n", abbrev(hex.EncodeToString(dv.Deliverer.Compressed())),
 		dv.Time.Format(time.RFC3339), abbrev(hex.EncodeToString(info.Identity.Compressed())))

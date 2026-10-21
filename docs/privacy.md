@@ -81,6 +81,12 @@ is always public.
   paid for from your fund address, which links the two to anyone who follows
   the coin. `-carrier-key identity` signs the carriers as you instead, and
   `-originator absent` leaves your signature out of the content.
+- **Each grant leaves a mark on chain.** A delivery is anchored by a
+  transaction its deliverer mines, naming the content id, the delivery's hash
+  and a salted commitment to the reader data. Anyone can see that the
+  deliverer's anchor key delivered that content once more; who the reader is,
+  and what was recorded about them, opens only with the deliverer's salt. The
+  message box, when one carries the delivery, sees who sent how much to whom.
 
 ## Reading
 

@@ -261,7 +261,8 @@ Flags go on either side of the address. `list` and `verify` take none; `-h` or
 
 ## Owner command flags
 
-The sending commands (`create`, `status`, `rotate`, `retire`, `kill`, `pay`)
+The sending commands (`create`, `status`, `rotate`, `retire`, `kill`, `pay`,
+`grant`, `deliver`)
 spend real funds and send nothing without `-yes`: they build, print and
 discard, saying so on stderr. Under `funding = wallet` they refuse to run
 without `-yes` or with `-dry-run` (exit 2).
@@ -297,6 +298,8 @@ without `-yes` or with `-dry-run` (exit 2).
 | `publish` | `-resume` | `false`, required | re-send the object leg for the current state |
 | `publish` | `-facade URL` | the `facade` key | send to another facade, or a comma-separated list, for this run |
 | `grant <store> <reader>` | `-release-only` | `false` | write the release alone, for a host to deliver; otherwise a delivery from this home |
+| `grant`, `deliver <release>` | `-yes` | `false` | **enables the spend**: mine the delivery's anchor and hand the delivery over; without it the anchor is printed and nothing is sent |
+| `grant`, `deliver <release>` | `-reader-data TEXT` | none | what the anchor commits to about the reader, salted; kept in `anchors/`, never on chain |
 | `grant`, `deliver <release>` | `-out FILE` | under `releases/` or `deliveries/` in the home | where the file goes |
 | `open <delivery> [address]` | the reader flags | | read the store the delivery grants, from the publisher's record |
 | `grant`, `deliver`, `inbox` | `-messagebox URL` | the `messagebox` key | send the delivery to the reader's box; `inbox` takes this identity's deliveries from it |

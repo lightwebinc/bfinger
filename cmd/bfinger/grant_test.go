@@ -14,7 +14,11 @@ import (
 
 	"github.com/lightwebinc/bfinger/internal/messagebox"
 	"github.com/lightwebinc/bfinger/internal/messagebox/mbtest"
+	"github.com/lightwebinc/bfinger/internal/protocol/private"
+	"github.com/lightwebinc/bfinger/internal/publisher/owner"
 )
+
+func chainhashFromHex(txid string) ([32]byte, error) { return private.HeadC(txid) }
 
 // D7: the publisher grants one reader a private store; the delivery opens
 // for that reader only, and the store it carries is proven against the
@@ -27,7 +31,7 @@ func TestGrantDeliversAPrivateStoreToOneReader(t *testing.T) {
 	bobKey, eveKey := bob.identity(), eve.identity()
 
 	out := filepath.Join(t.TempDir(), "note.bfd")
-	e.must("grant", "note", bobKey, "-out", out)
+	e.must("grant", "note", bobKey, "-out", out, "-reader-data", "198.51.100.7", "-yes")
 	if fi, err := os.Stat(out); err != nil || fi.Mode().Perm() != 0o600 {
 		t.Fatalf("delivery file: %v", err)
 	}
@@ -44,8 +48,40 @@ func TestGrantDeliversAPrivateStoreToOneReader(t *testing.T) {
 	if st := storeNamed(&lr, "note"); st == nil || !st.Code.OK() || st.Body["note"] != "for bob only" {
 		t.Fatalf("bob: %+v", st)
 	}
-	if !strings.Contains(bob.stderr, "granted by") {
-		t.Fatalf("no provenance line:\n%s", bob.stderr)
+	if !strings.Contains(bob.stderr, "granted by") || !strings.Contains(bob.stderr, "this delivery, mined at height") {
+		t.Fatalf("no provenance or anchor line:\n%s", bob.stderr)
+	}
+	// The deliverer keeps the anchor with the salt that opens its reader
+	// commitment; the reader data is in the ledger, never in the anchor.
+	led, _ := filepath.Glob(filepath.Join(e.home, anchorDir, "*.json"))
+	if len(led) != 1 {
+		t.Fatalf("anchor ledger: %v", led)
+	}
+	lraw, _ := os.ReadFile(led[0])
+	var l anchorLedger
+	if err := json.Unmarshal(lraw, &l); err != nil || l.ReaderData != "198.51.100.7" || l.Height == 0 {
+		t.Fatalf("ledger %+v %v", l, err)
+	}
+	if tx := e.chain.Tx(l.Txid); tx == nil || strings.Contains(tx.Hex(), hex.EncodeToString([]byte("198.51.100.7"))) {
+		t.Fatal("the anchor is not on the chain, or carries the reader data in the clear")
+	}
+
+	// A handoff whose anchor names another transaction is refused.
+	h, err := private.DecodeHandoff(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A real transaction, and not an anchor of this delivery.
+	st, _ := owner.Load(e.home)
+	other, _ := chainhashFromHex(st.Trees[0].Txid)
+	h.Anchor = other
+	forged, _ := h.Encode()
+	fpath := filepath.Join(t.TempDir(), "forged.bfd")
+	if err := os.WriteFile(fpath, forged, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code := bob.run("open", fpath, "-yes"); code != 1 || !strings.Contains(bob.stderr, "anchor does not match the delivery") {
+		t.Fatalf("forged anchor: exit %d\n%s", code, bob.stderr)
 	}
 
 	// Eve holds bob's delivery and opens nothing.
@@ -57,7 +93,11 @@ func TestGrantDeliversAPrivateStoreToOneReader(t *testing.T) {
 	rel := filepath.Join(t.TempDir(), "note.bfr")
 	e.must("grant", "note", eveKey, "-release-only", "-out", rel)
 	dv := filepath.Join(t.TempDir(), "eve.bfd")
-	host.must("deliver", rel, "-out", dv)
+	if code := host.run("deliver", rel, "-out", dv); code == 0 {
+		t.Fatal("a host with no coin anchored a delivery")
+	}
+	host.must("fund", "-blocks", "102")
+	host.must("deliver", rel, "-out", dv, "-yes")
 	eve.must("open", dv, "-yes")
 	if !strings.Contains(eve.stdout, "for bob only") || !strings.Contains(eve.stderr, "delivered by "+abbrev(host.identity())) {
 		t.Fatalf("eve via the host:\n%s\n%s", eve.stdout, eve.stderr)
@@ -85,7 +125,7 @@ func TestGrantThroughAMessageBox(t *testing.T) {
 	e := newE2EHome(t)
 	e.must("create", "alice@example.com", "-set", "status=one", "-private", "note=through the box", "-yes")
 	bob := e.peer()
-	e.must("grant", "note", bob.identity(), "-messagebox", hs.URL)
+	e.must("grant", "note", bob.identity(), "-messagebox", hs.URL, "-yes")
 	if !strings.Contains(e.stdout, "sent to") {
 		t.Fatalf("grant:\n%s", e.stdout)
 	}

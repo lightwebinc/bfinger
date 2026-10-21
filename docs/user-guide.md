@@ -399,13 +399,13 @@ not depend on them.
 
 ## 8. Publishing your own
 
-**Standing warning.** `create`, `status`, `rotate`, `retire`, `kill` and `pay`
-spend real funds. None sends anything without `-yes`: the transition is built,
+**Standing warning.** `create`, `status`, `rotate`, `retire`, `kill`, `pay`,
+`grant` and `deliver` spend real funds. None sends anything without `-yes`: the transition is built,
 `no -yes given: building only, sending nothing` is printed, and it is
 discarded. Under `funding = wallet` a missing `-yes`, or `-dry-run`, is
 refused instead (exit 2), because a wallet broadcasts what it signs. `init`, `fund -txid`, `fund -beef`,
-`doctor`, `receive`, `publish -resume`, `serve-wallet` and `domain-docs` spend
-nothing. `fund` without `-txid` or `-beef` mines coinbase on your own node at
+`doctor`, `receive`, `publish -resume`, `serve-wallet`, `domain-docs`, `open`,
+`inbox` and `grant -release-only` spend nothing. `fund` without `-txid` or `-beef` mines coinbase on your own node at
 once (coinbase: only on a regtest chain you run, for development and tests).
 
 **What publishing needs**, beyond `header_url`: `facade` (an overlay submit
@@ -669,14 +669,20 @@ record; `-originator absent` leaves them out. Anyone holding the store key can
 read the store: hand it over as carefully as the content deserves.
 
 **Granting a reader.** Rather than handing over the store key itself,
-`bfinger grant note bob@example.org` (an address or an identity key) writes a
-delivery for that one reader: the store key encrypted to them and signed by
-you, wrapped with a nonce and the time. They run `bfinger open note.bfd`, which
+`bfinger grant note bob@example.org -yes` (an address or an identity key)
+writes a delivery for that one reader: the store key encrypted to them and
+signed by you, wrapped with a nonce and the time, and anchored by a small
+transaction you pay for, the chain's record that this reader was given this
+content (`-reader-data TEXT` commits to anything you want to be able to prove
+about the delivery later, without putting it on chain; the salt that opens it
+stays in `~/.bfinger/anchors/`). They run `bfinger open note.bfd`, which
 checks both signatures, decrypts the key with their own identity, reads your
 record and proves the store against it. Nobody else can open that file. A host
 can do the delivering instead: `grant note bob@example.org -release-only`
-writes the release, and the host runs `bfinger deliver release.bfr`; the host
-learns who was granted what, never the key.
+writes the release (that spends nothing), and the host runs
+`bfinger deliver release.bfr -yes`, paying for the anchor itself; the host
+learns who was granted what, never the key. The reader's `open` refuses a
+delivery whose anchor is missing or is not this delivery's.
 
 To hand a delivery over through a BRC-33 message box instead of by hand, add
 `-messagebox https://messagebox.example.com` to `grant` or `deliver` (or set

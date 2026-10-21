@@ -395,11 +395,29 @@ identity, the reader and the content id, and never the store key. Two
 deliveries of one release are different bytes (nonce, time), and that is the
 deliverer's watermark; the publisher's is the release.
 
+**Every delivery is anchored.** Before a delivery is handed over, its
+deliverer mines one transaction, paid from its own coin, whose output 0 (1
+satoshi) is a lock-before PushDrop of `["bf" + 0x03, contentId, SHA-256(the
+delivery), readerCommit]` with the field signature, locked under the
+deliverer's `[1, "bfinger anchor"]` / `"anchor"` key (counterparty anyone,
+`forSelf = true`). `readerCommit` is
+`SHA-256("bfinger anchor reader v1" || 0x00 || salt || reader key || data)`,
+where `data` is whatever the deliverer wants to be able to prove about the
+delivery later (an address it went to, say) and the 32-byte `salt` stays with
+the deliverer: the data is never on chain, and the commitment binds it. The
+reader is handed `{v: 1, delivery, anchor}`, the delivery's bytes and the
+anchor's txid (hash order), since a delivery cannot name the transaction that
+names it. A reader refuses a delivery whose anchor is not found or is not the
+deliverer's anchor of this content and this delivery, and checks its proof
+against its own header source once it has one. The anchor is the chain's
+evidence that this reader was given this content by this deliverer; the
+deliverer pays for it, so nothing depends on a reader paying for it to exist.
+
 **Handing it over: a BRC-33 message box.** A delivery is binary and goes to
 the reader as a message: `POST /sendMessage` with
 `{message: {recipient: <reader key hex>, messageBox: "bfinger_private_store",
 messageId: <hex of the first 16 bytes of SHA-256(delivery)>, body: <base64 of
-the delivery>}}`, mutually authenticated (BRC-103/104) as the deliverer. The
+the handoff>}}`, mutually authenticated (BRC-103/104) as the deliverer. The
 reader lists the box (`/listMessages`), keeps each message that opens as a
 delivery for it, and acknowledges those (`/acknowledgeMessage`); anything else
 stays. The message id makes a resend one message. The server learns who sent
@@ -657,6 +675,8 @@ Frozen by the first private store handed out:
   version `1`;
 - the message box name `bfinger_private_store`, the message id and the base64
   body;
+- the anchor tag `"bf" + 0x03`, its fields and derivation, the reader
+  commitment's domain string, and the handoff's members;
 - key 13 and the seal's member names and values; the segment numbering
   (members from 0, the manifest at `count`); the inner map's keys `body`,
   `originator` and `sig`; the originator derivation and digest.
