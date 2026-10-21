@@ -2,12 +2,14 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/lightwebinc/bfinger/internal/protocol/private"
 	"net/http"
 	"os"
 	"sort"
@@ -41,6 +43,9 @@ type readerFlags struct {
 	verbose       bool
 	ansi          bool
 	ascii         bool
+	// open is the store keys a reader was handed, one file each, for the
+	// private stores they open.
+	open []string
 }
 
 func parseReader(name string, args []string, defaultUnmined bool, stderr *os.File) (*readerFlags, string, error) {
@@ -73,6 +78,10 @@ func readerFlagSet(name string, defaultUnmined bool, stderr *os.File) (*flag.Fla
 	fs.BoolVar(&rf.once, "once", false, "with -watch, exit after the first change")
 	fs.BoolVar(&rf.json, "json", false, "machine output, stable schema")
 	fs.BoolVar(&rf.verbose, "v", false, "verbose: print every verification step")
+	fs.Func("open", "a private store's store key FILE, handed to you by its publisher (repeatable)", func(v string) error {
+		rf.open = append(rf.open, v)
+		return nil
+	})
 	return fs, rf
 }
 
@@ -155,6 +164,8 @@ type storeResult struct {
 	Manifest string         `json:"manifestTxid,omitempty"`
 	Members  []string       `json:"memberTxids,omitempty"`
 	Body     map[string]any `json:"body,omitempty"`
+	// Private is set for a store committed to by a salted root.
+	Private bool `json:"private,omitempty"`
 }
 
 // readStores fetches and verifies every store the verified record links, at
@@ -174,15 +185,22 @@ func readStores(ctx context.Context, g *global, hs *hostset.Client, base string,
 	// makes refs that name one head cost one fetch, and the byte budget
 	// bounds the run whatever the record says.
 	spent := 0
-	cache := map[[32]byte][]verify.Item{}
-	fetch := func(c [32]byte) ([]verify.Item, []string, error) {
-		if items, ok := cache[c]; ok {
+	type cacheKey struct {
+		under string
+		c     [32]byte
+	}
+	cache := map[cacheKey][]verify.Item{}
+	// fetch asks for carrier c under the key its carriers are indexed by:
+	// the identity's for a public store, the store key's for a private one.
+	fetch := func(under []byte, c [32]byte) ([]verify.Item, []string, error) {
+		ck := cacheKey{string(under), c}
+		if items, ok := cache[ck]; ok {
 			return items, nil, nil
 		}
 		if spent >= maxStoreBytesPerRun {
 			return nil, nil, errStoreBudget
 		}
-		answers, err := lookup.Query(ctx, hs, base, lookup.CarrierQuestion(keyBytes, c))
+		answers, err := lookup.Query(ctx, hs, base, lookup.CarrierQuestion(under, c))
 		if err != nil {
 			return nil, nil, err
 		}
@@ -193,13 +211,18 @@ func readStores(ctx context.Context, g *global, hs *hostset.Client, base string,
 		for _, it := range items {
 			spent += len(it.Beef)
 		}
-		cache[c] = items
+		cache[ck] = items
 		return items, agreeing, nil
 	}
 
 	var out []storeResult
 	for _, ref := range refs {
 		sr := storeResult{Name: ref.Name, Count: ref.Count}
+		leaf, err := record.RefLeaf(ref)
+		if err == nil && leaf == record.LeafSalted {
+			out = append(out, readPrivate(ctx, g, ref, keyBytes, fetch, &spent, opt))
+			continue
+		}
 		head, err := verify.Head(ref)
 		switch {
 		case errors.Is(err, verify.ErrUnsupported):
@@ -228,7 +251,7 @@ func readStores(ctx context.Context, g *global, hs *hostset.Client, base string,
 			out = append(out, sr)
 			continue
 		}
-		items, agreeing, err := fetch(head)
+		items, agreeing, err := fetch(keyBytes, head)
 		if err != nil {
 			sr.Code, sr.Reason = codeFor(err), reasonFor(err, agreeing)
 			out = append(out, sr)
@@ -246,67 +269,139 @@ func readStores(ctx context.Context, g *global, hs *hostset.Client, base string,
 			out = append(out, sr)
 			continue
 		}
-
 		man, res := verify.ManifestOf(ctx, items, identity, ref, opt)
-		sr.Code, sr.Reason = res.Code, res.Reason
-		if res.Carrier != nil {
-			sr.Manifest = res.Carrier.Tx.TxID().String()
-		}
-		if man == nil {
-			out = append(out, sr)
-			continue
-		}
-		// The manifest verified against the root, so the member list is as
-		// binding as the record itself. Each member is still verified as a
-		// carrier: the manifest says which commitment, not what is under it.
-		//
-		// The declared sizes are what a manifest carries them for: the cost
-		// of the whole store is known before the first member is fetched,
-		// so a store larger than this run will spend is refused up front
-		// rather than after most of it is down.
-		var declared uint64
-		for _, mem := range man.Members {
-			declared += mem.Size
-		}
-		if declared > uint64(maxStoreBytesPerRun-spent) {
-			sr.Code = verify.Error
-			sr.Reason = fmt.Sprintf("the manifest declares %d bytes across %d member(s), more than this run will fetch", declared, len(man.Members))
-			out = append(out, sr)
-			continue
-		}
-		var parts []string
-		for i, mem := range man.Members {
-			mitems, magreeing, err := fetch(mem.C)
-			if err != nil {
-				sr.Code, sr.Reason = codeFor(err), fmt.Sprintf("member %d: %s", i+1, reasonFor(err, magreeing))
-				break
-			}
-			mres := verify.MemberOf(ctx, mitems, identity, ref.Name, i+1, mem, opt)
-			if !mres.Code.OK() {
-				sr.Code, sr.Reason = mres.Code, mres.Reason
-				break
-			}
-			v, ok := mres.Record.Body.Get(ref.Name)
-			text, isText := v.(string)
-			if !ok || !isText {
-				sr.Code = verify.RefusedDecode
-				sr.Reason = fmt.Sprintf("member %d does not carry a %q field", i+1, ref.Name)
-				break
-			}
-			if uint64(len(text)) != mem.Size {
-				sr.Code = verify.RefusedCommit
-				sr.Reason = fmt.Sprintf("member %d is %d bytes, the manifest says %d", i+1, len(text), mem.Size)
-				break
-			}
-			parts = append(parts, text)
-			sr.Members = append(sr.Members, mres.Carrier.Tx.TxID().String())
-		}
-		if sr.Code.OK() && len(parts) == len(man.Members) {
-			sr.Body = map[string]any{ref.Name: strings.Join(parts, "")}
-		}
+		readMembers(ctx, &sr, ref.Name, man, res, func(c [32]byte) ([]verify.Item, []string, error) { return fetch(keyBytes, c) }, identity, spent, opt)
 		out = append(out, sr)
 	}
 	return out
+}
+
+// readMembers finishes reading a store of more than one member whose
+// manifest has just been checked: each member is fetched and verified as a
+// carrier in its own right, under the key the store's carriers are indexed
+// by, and the members' content is joined in manifest order.
+func readMembers(ctx context.Context, sr *storeResult, name string, man *record.Manifest, res *verify.StoreResult,
+	fetch func(c [32]byte) ([]verify.Item, []string, error), under *ec.PublicKey, spent int, opt verify.Options) {
+	sr.Code, sr.Reason = res.Code, res.Reason
+	if res.Carrier != nil {
+		sr.Manifest = res.Carrier.Tx.TxID().String()
+	}
+	if man == nil {
+		return
+	}
+	// The manifest verified against the root, so the member list is as
+	// binding as the record itself. Each member is still verified as a
+	// carrier: the manifest says which commitment, not what is under it.
+	//
+	// The declared sizes are what a manifest carries them for: the cost
+	// of the whole store is known before the first member is fetched,
+	// so a store larger than this run will spend is refused up front
+	// rather than after most of it is down.
+	var declared uint64
+	for _, mem := range man.Members {
+		declared += mem.Size
+	}
+	if declared > uint64(maxStoreBytesPerRun-spent) {
+		sr.Code = verify.Error
+		sr.Reason = fmt.Sprintf("the manifest declares %d bytes across %d member(s), more than this run will fetch", declared, len(man.Members))
+		return
+	}
+	var parts []string
+	for i, mem := range man.Members {
+		mitems, magreeing, err := fetch(mem.C)
+		if err != nil {
+			sr.Code, sr.Reason = codeFor(err), fmt.Sprintf("member %d: %s", i+1, reasonFor(err, magreeing))
+			break
+		}
+		mres := verify.MemberOf(ctx, mitems, under, name, i+1, mem, opt)
+		if !mres.Code.OK() {
+			sr.Code, sr.Reason = mres.Code, mres.Reason
+			break
+		}
+		v, ok := mres.Record.Body.Get(name)
+		text, isText := v.(string)
+		if !ok || !isText {
+			sr.Code = verify.RefusedDecode
+			sr.Reason = fmt.Sprintf("member %d does not carry a %q field", i+1, name)
+			break
+		}
+		if uint64(len(text)) != mem.Size {
+			sr.Code = verify.RefusedCommit
+			sr.Reason = fmt.Sprintf("member %d is %d bytes, the manifest says %d", i+1, len(text), mem.Size)
+			break
+		}
+		parts = append(parts, text)
+		sr.Members = append(sr.Members, mres.Carrier.Tx.TxID().String())
+	}
+	if sr.Code.OK() && len(parts) == len(man.Members) {
+		sr.Body = map[string]any{name: strings.Join(parts, "")}
+	}
+}
+
+// readPrivate reads a private store, which only a reader holding its store
+// key can: the record commits to it by a salted root and names no head.
+// Without a key it is reported committed to and not linked, which is
+// exactly what it is to everyone else.
+func readPrivate(ctx context.Context, g *global, ref record.Ref, keyBytes []byte,
+	fetch func(under []byte, c [32]byte) ([]verify.Item, []string, error), spent *int, opt verify.Options) storeResult {
+	sr := storeResult{Name: ref.Name, Count: ref.Count, Private: true}
+	k := g.openKeys[ref.Name]
+	if k == nil {
+		sr.Code = verify.NoToken
+		sr.Reason = fmt.Sprintf("private store %q: committed to by a salted root and linked from nowhere; open it with -open and the store key its publisher handed you", ref.Name)
+		return sr
+	}
+	if !bytes.Equal(k.Identity.Compressed(), keyBytes) {
+		sr.Code = verify.RefusedKey
+		sr.Reason = fmt.Sprintf("private store %q: the store key is for identity %s, not this one", ref.Name, abbrev(k.IdentityKey))
+		return sr
+	}
+	if k.Count != ref.Count {
+		sr.Code = verify.RefusedCommit
+		sr.Reason = fmt.Sprintf("private store %q: the store key names %d member(s), the record commits to %d", ref.Name, k.Count, ref.Count)
+		return sr
+	}
+	under := k.Carrier.Compressed()
+	pk := verify.PrivateKey{Head: k.HeadC, Salt: k.SaltB, CarrierKey: k.Carrier}
+	items, agreeing, err := fetch(under, k.HeadC)
+	if err != nil {
+		sr.Code, sr.Reason = codeFor(err), reasonFor(err, agreeing)
+		return sr
+	}
+	if ref.Count == 1 {
+		res := verify.PrivateSubRecord(ctx, items, ref, pk, opt)
+		sr.Code, sr.Reason = res.Code, res.Reason
+		if res.Carrier != nil {
+			sr.Carrier = res.Carrier.Tx.TxID().String()
+		}
+		if res.Code.OK() && res.Record != nil {
+			sr.Body = bodyMap(res.Record.Body)
+		}
+		return sr
+	}
+	man, res := verify.PrivateManifestOf(ctx, items, ref, pk, opt)
+	readMembers(ctx, &sr, ref.Name, man, res, func(c [32]byte) ([]verify.Item, []string, error) { return fetch(under, c) }, k.Carrier, *spent, opt)
+	return sr
+}
+
+// loadOpenKeys reads the store keys given with -open, refusing two for one
+// store: a store has one key, so a second is a mistake to name rather than
+// one to pick between.
+func (g *global) loadOpenKeys(paths []string) error {
+	for _, p := range paths {
+		k, err := readPrivateKey(p)
+		if err != nil {
+			return err
+		}
+		if g.openKeys == nil {
+			g.openKeys = map[string]*private.Parsed{}
+		}
+		if _, dup := g.openKeys[k.Store]; dup {
+			return usage(fmt.Sprintf("-open: two store keys for store %q", k.Store))
+		}
+		g.openKeys[k.Store] = k
+	}
+	return nil
 }
 
 // fieldValue resolves a field name the way the plain rendering does: the
@@ -538,6 +633,9 @@ func resolveAndVerify(ctx context.Context, g *global, acctArg string, stderr *os
 			if ref.Head != nil {
 				entry["head"] = hex.EncodeToString(ref.Head[:])
 			}
+			if leaf, err := record.RefLeaf(ref); err == nil && leaf != record.LeafPublic {
+				entry["leaf"] = leaf
+			}
 			lr.Refs = append(lr.Refs, entry)
 		}
 		// 7. The stores, only once the record they hang off verified: a
@@ -719,6 +817,9 @@ func cmdLookup(ctx context.Context, g *global, args []string, stdout, stderr *os
 	if err != nil {
 		return err
 	}
+	if err := g.loadOpenKeys(rf.open); err != nil {
+		return err
+	}
 	if rf.watch {
 		return watch(ctx, g, acct, rf, stdout, stderr)
 	}
@@ -768,6 +869,9 @@ func watch(ctx context.Context, g *global, acct string, rf *readerFlags, stdout,
 func cmdVerify(ctx context.Context, g *global, args []string, stdout, stderr *os.File) error {
 	rf, acct, err := parseReader("verify", args, false, stderr)
 	if err != nil {
+		return err
+	}
+	if err := g.loadOpenKeys(rf.open); err != nil {
 		return err
 	}
 	lr, err := resolveAndVerify(ctx, g, acct, stderr)
@@ -906,6 +1010,8 @@ func printHuman(w *os.File, lr *lookupResult, long bool, o renderOpts) {
 			switch {
 			case st.Manifest != "":
 				fmt.Fprintf(w, "  %-10s %s manifest %s, %d member(s)\n", "store", safeLabel(st.Name), st.Manifest, len(st.Members))
+			case st.Carrier != "" && st.Private:
+				fmt.Fprintf(w, "  %-10s %s private, carrier %s\n", "store", safeLabel(st.Name), st.Carrier)
 			case st.Carrier != "":
 				fmt.Fprintf(w, "  %-10s %s carrier %s\n", "store", safeLabel(st.Name), st.Carrier)
 			}

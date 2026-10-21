@@ -649,6 +649,17 @@ own; a larger funding tree is minted when needed (`-funding-count N`, default
 document back through `-json`:
 `bfinger alice@example.com -json | jq -r '.stores[] | select(.name=="doc") | .body.doc'`.
 
+**Private stores.** `-private name=text` or `-private name=@file` publishes a
+store meant only for readers you choose. Its entry commits to it by a root
+salted with a secret and names no head, so neither a host nor a reader of your
+record can find or match its carriers; the name is held to
+`A-Z a-z 0-9 . _ -`. The command writes the store key, which is what opens the
+store, to `~/.bfinger/private/<name>.json` (0600). Hand it to a reader; they
+read the store with `bfinger alice@example.com -open note.json`, which proves
+the store is the one your record commits to before printing it. Without the
+key, the store reads `NO-TOKEN ... open it with -open`. Anyone holding the key
+can read the store, and its carriers are content on the hosts like any other.
+
 `UNSUPPORTED` on a store means the reader lacks a store feature; a reader too
 old for stores refuses the record with
 `REFUSED-DECODE ... field has the wrong shape: ref`. Both are cured by

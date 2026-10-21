@@ -47,10 +47,20 @@ func goldens() {
 		}},
 		11: []any{},
 	}
+	// A private store's entry: a salted root, no head, and the layout
+	// member. It is what a host must carry verbatim and an older reader
+	// must keep and refuse for that store alone.
+	private := map[int]any{
+		0: []byte("bfr\x01"), 1: idk, 2: uint64(1), 3: uint64(1),
+		4: fill(0x00, 32), 5: fill(0x22, 32), 6: fill(0x33, 32),
+		8: uint64(1700000000), 9: uint64(0),
+		10: map[string]any{"status": "available"},
+		11: []any{map[string]any{"name": "note", "root": fill(0x77, 32), "count": uint64(1), "leaf": "salted"}},
+	}
 	for _, g := range []struct {
 		name string
 		v    any
-	}{{"create", create}, {"update", update}, {"manifest", manifest}} {
+	}{{"create", create}, {"update", update}, {"manifest", manifest}, {"private", private}} {
 		b, err := enc.Marshal(g.v)
 		if err != nil {
 			panic(err)

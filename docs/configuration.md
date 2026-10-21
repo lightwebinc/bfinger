@@ -237,6 +237,7 @@ side of the address. `-json` and `-v` are also global flags.
 | `-field NAME` | none | print one body field, or a store of that name, and nothing else. Prints nothing when the field is missing or on a refusal, so branch on the exit status |
 | `-json` | `false` | one indented object. Wins over `-field` |
 | `-v` | `false` | the step trace on stderr; `verify` always prints it |
+| `-open FILE` | none, repeatable | a private store's store key, handed to you by its publisher: the store is read and proven against the record |
 | `-yes` | `false` | accept a first-contact pin without prompting. Required in a script |
 | `-accept-unmined` | `true` for a lookup, `false` for `verify` | exit 0 on `VERIFIED-UNMINED`. Turn off with `-accept-unmined=false` |
 | `-ansi` | `false` | let a record's color through: SGR sequences only, re-validated, each colored value ending with a reset |
@@ -275,6 +276,7 @@ without `-yes` or with `-dry-run` (exit 2).
 | `create`, `status`, `rotate` | `-set k=v`, `-set k=@file` | none, repeatable | set a body field, from a file with `@` |
 | `create`, `status`, `rotate` | `-unset k` | none, repeatable | remove a body field |
 | `create`, `status`, `rotate` | `-store name=text`, `-store name=@file` | none, repeatable | publish the value as a sub-record in its own carrier and commit to it from the record |
+| `create`, `status`, `rotate` | `-private name=text`, `-private name=@file` | none, repeatable | publish the value as a private store: salted root, no head; its store key goes to `private/<name>.json` |
 | `create`, `status`, `rotate` | `-unstore name` | none, repeatable | drop a sub-store from the record |
 | `create`, `status`, `rotate` | `-expires DUR` | `0`, unbounded | the validity window's upper bound, from now |
 | `create`, `status`, `rotate` | `-funding-count N` | `16` | outputs per funding tree when one is minted |

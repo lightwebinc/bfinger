@@ -12,6 +12,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/lightwebinc/bfinger/internal/protocol/private"
 	"net/http"
 	"os"
 	"os/signal"
@@ -141,6 +142,9 @@ type global struct {
 	// stderr is the run's standard error, for notes made below a command,
 	// such as a facade that missed an object. Nil writes nowhere.
 	stderr *os.File
+	// openKeys are the store keys the reader was handed (-open), by store
+	// name.
+	openKeys map[string]*private.Parsed
 }
 
 // isCommand reports whether a first word is a command rather than an address.

@@ -62,6 +62,12 @@ type Store struct {
 	// minted, so a re-send puts the members on the plane before the
 	// manifest that names them. The manifest is last.
 	Carriers []StoreCarrier `json:"carriers"`
+	// Leaf is the store's member layout, record.LeafPublic (empty) or
+	// record.LeafSalted, and SaltHex the private store's salt. A private
+	// store's entry names no head; Head is kept here all the same, because
+	// the owner hands it out in the store key and re-sends from it.
+	Leaf    string `json:"leaf,omitempty"`
+	SaltHex string `json:"salt,omitempty"`
 
 	// The fields a state written before stores could hold more than one
 	// carrier used. They are read and converted by Load, never written.
@@ -100,7 +106,10 @@ func (s *Store) Ref() (*record.Ref, error) {
 		return nil, fmt.Errorf("count %d with %d carrier(s)", s.Count, len(s.Carriers))
 	}
 	ref := &record.Ref{Name: s.Name, Count: s.Count, Head: &head}
-	if s.Count == 1 {
+	if s.Leaf != record.LeafPublic && s.Leaf != record.LeafSalted {
+		return nil, fmt.Errorf("store %q: unknown member layout %q", s.Name, s.Leaf)
+	}
+	if s.Count == 1 && s.Leaf == record.LeafPublic {
 		ref.Root = store.Root(*ref, nil)
 		return ref, nil
 	}
@@ -119,6 +128,14 @@ func (s *Store) Ref() (*record.Ref, error) {
 	}
 	if uint64(len(leaves)) != s.Count {
 		return nil, fmt.Errorf("count %d with %d member(s)", s.Count, len(leaves))
+	}
+	if s.Leaf == record.LeafSalted {
+		salt, err := hash32(s.SaltHex)
+		if err != nil {
+			return nil, fmt.Errorf("salt: %w", err)
+		}
+		r := record.SaltedRef(s.Name, leaves, salt)
+		return &r, nil
 	}
 	ref.Root = store.Root(*ref, leaves)
 	return ref, nil

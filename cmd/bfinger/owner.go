@@ -319,10 +319,12 @@ func cmdFund(ctx context.Context, g *global, args []string, stdout, stderr *os.F
 
 // transitionFlags are shared by create and status.
 type transitionFlags struct {
-	set       map[string]string
-	unset     []string
-	store     map[string]string
-	unstore   []string
+	set     map[string]string
+	unset   []string
+	store   map[string]string
+	unstore []string
+	// private is the stores published private: salted, unlinked.
+	private   map[string]string
 	expires   time.Duration
 	yes       bool
 	dryRun    bool
@@ -368,6 +370,27 @@ func parseTransition(name string, args []string, stderr *os.File) (*transitionFl
 		tf.store[k] = val
 		return nil
 	})
+	fs.Func("private", "name=text or name=@file: publish the value as a private store, committed to by a salted root and linked from nowhere; its store key is written to private/<name>.json (repeatable)", func(v string) error {
+		k, val, ok := strings.Cut(v, "=")
+		if !ok || k == "" {
+			return errors.New("want name=text or name=@file")
+		}
+		if !privateName(k) {
+			return errors.New("a private store's name is 1 to 64 of A-Z a-z 0-9 . _ -, since it names its key file")
+		}
+		if strings.HasPrefix(val, "@") && len(val) > 1 {
+			raw, err := os.ReadFile(val[1:])
+			if err != nil {
+				return err
+			}
+			val = strings.TrimSuffix(string(raw), "\n")
+		}
+		if tf.private == nil {
+			tf.private = map[string]string{}
+		}
+		tf.private[k] = val
+		return nil
+	})
 	fs.Func("unstore", "sub-store to drop from the record (repeatable)", func(v string) error {
 		tf.unstore = append(tf.unstore, v)
 		return nil
@@ -385,6 +408,11 @@ func parseTransition(name string, args []string, stderr *os.File) (*transitionFl
 	positional, err := collectPositional(fs, args)
 	if err != nil {
 		return nil, nil, err
+	}
+	for name := range tf.private {
+		if _, both := tf.store[name]; both {
+			return nil, nil, usage(fmt.Sprintf("store %q is given as both -store and -private", name))
+		}
 	}
 	return tf, positional, nil
 }
@@ -954,9 +982,13 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 	// Plan before anything is minted, and before a tree is chosen: the
 	// transition's whole appetite for funding outputs is known from the
 	// content alone, and the tree is then sized to it.
-	names := make([]string, 0, len(s.tf.store))
-	for name := range s.tf.store {
-		names = append(names, name)
+	names := make([]string, 0, len(s.tf.store)+len(s.tf.private))
+	content := make(map[string]string, len(s.tf.store)+len(s.tf.private))
+	for name, v := range s.tf.store {
+		names, content[name] = append(names, name), v
+	}
+	for name, v := range s.tf.private {
+		names, content[name] = append(names, name), v
 	}
 	slices.Sort(names)
 	// Plan every store before minting anything. A store too large for one
@@ -967,7 +999,7 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 	plans := make(map[string][]string, len(names))
 	need := uint32(1) // the record's own carrier
 	for _, name := range names {
-		parts, err := chunkStore(name, s.tf.store[name])
+		parts, err := chunkStore(name, content[name])
 		if err != nil {
 			return err
 		}
@@ -975,8 +1007,14 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 		need += uint32(len(parts)) //nolint:gosec // bounded by MaxMembers
 		if len(parts) > 1 {
 			need++ // the manifest
-			s.say("store %q: %d bytes in %d parts plus a manifest", name, len(s.tf.store[name]), len(parts))
+			s.say("store %q: %d bytes in %d parts plus a manifest", name, len(content[name]), len(parts))
 		}
+	}
+	// A private store's salt, drawn once per store: the root commits to it,
+	// and the store key hands it to whoever is meant to read the store.
+	salts := make(map[string][32]byte, len(s.tf.private))
+	for name := range s.tf.private {
+		salts[name] = randomBytes()
 	}
 	tree, vout, err := s.fundingTree(ctx, need)
 	if err != nil {
@@ -1023,11 +1061,16 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 			s.say("store %q: carrier %s (%d bytes), funding output %d", name, sk.TxID(), sk.Size(), vout)
 			vout++
 		}
+		salt, private := salts[name]
 		if len(parts) == 1 {
 			// One member: the store's root IS the leaf hash of it, so a
 			// reader proves membership with one hash and no manifest is
 			// minted, carried or fetched.
-			rec.Refs = append(rec.Refs, storeRef(name, leaves, nil))
+			if private {
+				rec.Refs = append(rec.Refs, record.SaltedRef(name, leaves, salt))
+			} else {
+				rec.Refs = append(rec.Refs, storeRef(name, leaves, nil))
+			}
 			continue
 		}
 		man := &record.Manifest{Members: members}
@@ -1047,7 +1090,11 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 		// The root is over the MEMBERS, not over the manifest: the manifest
 		// is the head, which the record names separately, and a reader that
 		// has it recomputes this root from what it lists.
-		rec.Refs = append(rec.Refs, storeRef(name, leaves, &mc))
+		if private {
+			rec.Refs = append(rec.Refs, record.SaltedRef(name, leaves, salt))
+		} else {
+			rec.Refs = append(rec.Refs, storeRef(name, leaves, &mc))
+		}
 		subs = append(subs, minted{name, mr, mk, vout})
 		s.say("store %q: manifest carrier %s (%d bytes) over %d member(s), funding output %d", name, mk.TxID(), mk.Size(), len(members), vout)
 		vout++
@@ -1168,13 +1215,10 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 	// vouches for, and its carrier stays on the plane unreferenced.
 	var stores []owner.Store
 	for _, ref := range rec.Refs {
-		if ref.Head == nil {
-			continue
-		}
-		head := hex.EncodeToString(ref.Head[:])
 		// Minted by this transition: keep every carrier of the store, in
 		// the order they were minted, so `publish -resume` re-sends the
-		// parts before the manifest that names them.
+		// parts before the manifest that names them. The head is the last
+		// carrier: the one member, or the manifest after its members.
 		var carriers []owner.StoreCarrier
 		for _, m := range subs {
 			if m.name != ref.Name {
@@ -1186,12 +1230,17 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 			})
 		}
 		if len(carriers) > 0 {
-			stores = append(stores, owner.Store{Name: ref.Name, Head: head, Count: ref.Count, Carriers: carriers})
+			st := owner.Store{Name: ref.Name, Head: carriers[len(carriers)-1].CHex, Count: ref.Count, Carriers: carriers}
+			if salt, private := salts[ref.Name]; private {
+				st.Leaf, st.SaltHex = record.LeafSalted, hex.EncodeToString(salt[:])
+			}
+			stores = append(stores, st)
 			continue
 		}
-		// Carried forward from the previous state.
+		// Carried forward from the previous state: the store whose entry,
+		// rebuilt from the state, is this one.
 		for _, st := range s.st.Stores {
-			if st.Head == head {
+			if r, err := st.Ref(); err == nil && r.Name == ref.Name && r.Root == ref.Root {
 				stores = append(stores, st)
 				break
 			}
@@ -1200,6 +1249,13 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 	s.st.Stores = stores
 	if err := owner.Save(s.g.cfg.Home, s.st); err != nil {
 		return err
+	}
+	for _, st := range stores {
+		if _, minted := salts[st.Name]; minted {
+			if err := s.writeStoreKey(st); err != nil {
+				return fmt.Errorf("private store %q is published, but its store key could not be written: %w", st.Name, err)
+			}
+		}
 	}
 	if s.walletFunds() {
 		// After the save, never before: see relinquishFunding. Every output
@@ -1395,6 +1451,9 @@ func (s *session) carriedRefs(tf *transitionFlags) []record.Ref {
 			continue
 		}
 		if _, replaced := tf.store[st.Name]; replaced {
+			continue
+		}
+		if _, replaced := tf.private[st.Name]; replaced {
 			continue
 		}
 		ref, err := st.Ref()

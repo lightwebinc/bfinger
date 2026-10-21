@@ -290,6 +290,43 @@ computed. The record and every other store are unaffected. (A strict entry
 width would cost every older reader the whole record over one new store
 field.)
 
+**Private stores: the salted layout.** The leaf above is the hash of a
+public txid, and every host holds the carriers, so a host can hash an
+identity's carriers and match any root: a linked store is meant to be found,
+and an unlinked one is still matchable. A store meant for chosen readers only
+selects another member layout in its entry, with the member `leaf` (text):
+
+- absent: the layout above, `leaf = SHA-256(0x00 || c)`;
+- `"salted"`: `leaf = SHA-256(0x00 || c || salt)`, where `salt` is 32 random
+  bytes drawn once per store. The root is the RFC 6962 root over the members'
+  salted leaves in manifest order; a store of one member is its one salted
+  leaf's hash, as before.
+
+A salted entry names no `head` (a reader refuses one that does): the head
+would point every host at the store's first carrier. Nothing in the record
+leads to the carriers, and without the salt no one holding them can match the
+root, so the store is reached only through what its publisher hands a reader,
+the **store key**, a JSON object:
+
+```json
+{"v": 1, "identityKey": "<66 hex>", "store": "note", "count": 1,
+ "head": "<64 hex, display order>", "carrierKey": "<66 hex>", "salt": "<64 hex>"}
+```
+
+`identityKey` is the identity whose record carries the entry; `head` is the one
+member or the manifest; `carrierKey` is the key the store's carriers are signed
+and indexed under. The reader verifies the identity's record as usual, finds
+the entry by name, asks the carrier question for `head` under `carrierKey`,
+recomputes the salted root (over the manifest's members for `count > 1`) and
+requires it to equal the entry's, then verifies every carrier as a carrier
+under `carrierKey`. The salt is per store, never per reader: the root is one
+value. Whatever differs per reader is in the delivery, not the commitment.
+
+A reader that does not know `leaf` keeps it and reports the store unsupported,
+the rule above; one that knows it and holds no store key reports the store
+committed to and not linked. A host carries the member verbatim
+(`record-v1-private.hex` pins the bytes for both codecs).
+
 **Manifest body.** Exactly one key, `members`: an array of 1 to 1024
 fixed-width maps `{c: bytes(32), name: tstr, size: uint, type: tstr}`, all four
 keys always present (an optional key would give one member two encodings). `c`
@@ -524,6 +561,13 @@ Frozen by the first store published:
   `leaf(head)`, while `count > 1` means `head` is a manifest; and that a
   member's leaf is the hash of its commitment alone, which makes a linked store
   enumerable.
+
+Frozen by the first private store handed out:
+
+- the entry member `leaf` and its value `"salted"`; that a salted leaf is
+  `c || salt` with a 32-byte salt per store; that a salted entry names no head;
+- the store key's members `v`, `identityKey`, `store`, `count`, `head`,
+  `carrierKey` and `salt`, and version `1`.
 
 Frozen by the lookup service (§14):
 

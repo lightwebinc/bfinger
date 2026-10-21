@@ -67,16 +67,14 @@ is always public.
 - **A linked store is public.** An entry with a `head` lets any reader follow
   it: the one member, or for a larger store a manifest listing every member
   with its size and type.
-- **An unlinked store is unlisted, not private.** A leaf is the hash of a
-  member's carrier txid, and every subscribed host holds that carrier. A host
-  can hash an identity's carriers and match any root in its record. Hiding
-  membership from hosts needs a member encoding with a secret under the hash,
-  which is not built.
-
-So revealing one member with an inclusion path and nothing about the rest
-works only for an unlinked store, against a party that does not hold its
-carriers. The arithmetic is built (`bcommon/commit`); the private encoding is a
-seam.
+- **An unlinked public store is unlisted, not private.** A leaf is the hash of
+  a member's carrier txid, and every subscribed host holds that carrier. A host
+  can hash an identity's carriers and match any root in its record.
+- **A private store (`-private`) is not matchable.** Its leaves are salted
+  with a secret only its readers are handed, in the store key, and its entry
+  names no head, so a host holding every carrier cannot tell which root they
+  belong to. What a host still sees: that the record commits to a store of
+  that many members, and the carriers themselves.
 
 ## Reading
 
@@ -124,4 +122,3 @@ None of these are built.
 | Anyone with your key can trace your tokens | A fresh derivation per transition, at the cost of readers no longer finding your token from your key alone |
 | The subject's domain sees resolutions | Addressing by key (works today), or a resolution cache with a deliberate lifetime (does not exist) |
 | A payment notice is hand delivered | A messagebox (BRC-33), which adds a party who sees the metadata |
-| An unlinked store's membership is matchable by hosts | A member encoding carrying a secret the hash covers |

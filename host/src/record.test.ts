@@ -441,3 +441,18 @@ test('refs refusals keep their RecordError texts', () => {
   assert.equal(text(dec([entryWith({ root: fill(0xaa).subarray(0, 31), count: -1n })])), 'record: field: ref root wants 32 bytes')
   assert.equal(text(dec([entryWith({ root: fill(0xaa).subarray(0, 31), head: fill(0xcc).subarray(0, 1) })])), 'record: field: ref root wants 32 bytes')
 })
+
+// A private store's entry carries a member the host does not interpret, the
+// member layout. The host must keep it verbatim, never refuse the record
+// for it and never strip it, or a private store published to it would lose
+// its layout on the way to a reader.
+test('the private golden keeps the layout member through a re-encode', () => {
+  const want = recordGolden('record-v1-private')
+  const r = decodeRecord(want)
+  assert.equal(r.refs.length, 1)
+  const ref = r.refs[0]!
+  assert.equal(ref.name, 'note')
+  assert.equal(ref.head, undefined, 'a private store names no head')
+  assert.deepEqual(ref.unknown?.map((p) => [p.key, p.val]), [['leaf', 'salted']])
+  assert.equal(toHex(encodeRecord(r)), toHex(want), 're-encode differs')
+})
