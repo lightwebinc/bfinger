@@ -64,6 +64,10 @@ owner commands (the sending ones spend real funds and send nothing without
   publish -resume     re-send the object leg for the current state
   serve-wallet        serve this home's wallet over the BRC-100 wire, loopback only
   doctor              local state, pool, header source, chain, leg, fees, journal
+  grant <store> <reader>
+                      grant one reader a private store: a release, delivered
+  deliver <release>   wrap a release for its reader (a host's half)
+  open <delivery>     open a private store delivered to this identity
   domain-docs <acct> -host URL
                       write the domain's manifest.json and the handle's
                       resolve answer (see docs/self-host.md)

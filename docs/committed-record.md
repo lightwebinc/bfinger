@@ -366,6 +366,35 @@ is the content key. A reader checks the key against `keyCommit` before using
 it, the ciphertext against `contentId`, the segment index against the
 sub-record's position, then the tag, then the originator.
 
+**Granting a private store: two envelopes.** The content travels once,
+sealed, on the plane; what is unique per reader is the key release and the
+delivery around it. Both are canonical CBOR maps with text keys; both
+signatures are DER under counterparty anyone, so anyone holding the signer's
+identity key checks them; both ciphertexts are BRC-2 between two identities
+under a fresh 32-byte `nonce` as the key id.
+
+- **The release** (inner, the publisher's), `{v: 1, identity, reader,
+  contentId, nonce, sealed, sig}`: `identity` and `reader` are compressed keys;
+  `contentId` is the head's seal content id; `sealed` is the store key (JSON,
+  above) encrypted by the identity to the reader under `[2, "bfinger release"]`;
+  `sig` is the identity's under `[1, "bfinger release"]` / `"release"` over
+  `SHA-256("bfinger release v1" || 0x00 || the map without sig)`.
+- **The delivery** (outer, whoever delivers: the publisher or a host),
+  `{v: 1, deliverer, nonce, sealed}`, where `sealed` is, encrypted by the
+  deliverer to the reader under `[2, "bfinger delivery"]`, the map
+  `{v: 1, deliverer, reader, nonce, time, release, sig}`: the same deliverer and
+  nonce, the reader, unix seconds, the release's bytes, and the deliverer's
+  signature under `[1, "bfinger delivery"]` / `"delivery"` over
+  `SHA-256("bfinger delivery v1" || 0x00 || that map without sig)`.
+
+A reader decrypts the delivery, checks the deliverer's signature and that the
+delivery and the release inside it are both addressed to it, checks the
+identity's signature on the release, decrypts the store key, requires it to
+be the signing identity's, then reads the store as above. A deliverer sees the
+identity, the reader and the content id, and never the store key. Two
+deliveries of one release are different bytes (nonce, time), and that is the
+deliverer's watermark; the publisher's is the release.
+
 A reader that does not know `leaf` keeps it and reports the store unsupported,
 the rule above; one that knows it and holds no store key reports the store
 committed to and not linked. A host carries the member verbatim
@@ -612,6 +641,8 @@ Frozen by the first private store handed out:
   `c || salt` with a 32-byte salt per store; that a salted entry names no head;
 - the store key's members `v`, `identityKey`, `store`, `count`, `head`,
   `carrierKey`, `salt` and `contentKey`, and version `1`;
+- both envelopes' members, domain strings, protocols and key ids, and
+  version `1`;
 - key 13 and the seal's member names and values; the segment numbering
   (members from 0, the manifest at `count`); the inner map's keys `body`,
   `originator` and `sig`; the originator derivation and digest.

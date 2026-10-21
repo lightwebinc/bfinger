@@ -31,6 +31,7 @@ The directory is 0700 and every file bfinger writes in it is 0600.
 | `payments/<txid>.json` | a payment notice, what a messagebox would carry |
 | `private/<name>.json` | the store key of each private store published from here: what opens it |
 | `carrier-keys/<key>.json` | a key a private store's carriers are published under, kept for the kill switch |
+| `releases/`, `deliveries/` | envelopes `grant` and `deliver` wrote, each for one reader |
 | `backup.json` | when the home was last recorded as backed up, and a hash of the witness that copy holds (`doctor -backed-up`) |
 
 The witness in `state.json` is the one secret that is not a key: with the key

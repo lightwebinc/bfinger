@@ -282,3 +282,12 @@ func (e *e2eHome) identity() string {
 	e.t.Fatalf("no identity line in doctor:\n%s", e.stdout)
 	return ""
 }
+
+// peer is a second home on the same chain, host and config: another person,
+// with an identity and no coin.
+func (e *e2eHome) peer() *e2eHome {
+	e.t.Helper()
+	p := &e2eHome{t: e.t, home: e.t.TempDir(), cfg: e.cfg, chain: e.chain, host: e.host}
+	p.must("init")
+	return p
+}

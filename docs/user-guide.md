@@ -668,6 +668,16 @@ signature inside the sealed content, which the reader checks against the
 record; `-originator absent` leaves them out. Anyone holding the store key can
 read the store: hand it over as carefully as the content deserves.
 
+**Granting a reader.** Rather than handing over the store key itself,
+`bfinger grant note bob@example.org` (an address or an identity key) writes a
+delivery for that one reader: the store key encrypted to them and signed by
+you, wrapped with a nonce and the time. They run `bfinger open note.bfd`, which
+checks both signatures, decrypts the key with their own identity, reads your
+record and proves the store against it. Nobody else can open that file. A host
+can do the delivering instead: `grant note bob@example.org -release-only`
+writes the release, and the host runs `bfinger deliver release.bfr`; the host
+learns who was granted what, never the key.
+
 `UNSUPPORTED` on a store means the reader lacks a store feature; a reader too
 old for stores refuses the record with
 `REFUSED-DECODE ... field has the wrong shape: ref`. Both are cured by

@@ -295,6 +295,9 @@ without `-yes` or with `-dry-run` (exit 2).
 | `pay <acct\|key> <sats>` | `-yes`, `-dry-run` | `false` | as above |
 | `publish` | `-resume` | `false`, required | re-send the object leg for the current state |
 | `publish` | `-facade URL` | the `facade` key | send to another facade, or a comma-separated list, for this run |
+| `grant <store> <reader>` | `-release-only` | `false` | write the release alone, for a host to deliver; otherwise a delivery from this home |
+| `grant`, `deliver <release>` | `-out FILE` | under `releases/` or `deliveries/` in the home | where the file goes |
+| `open <delivery> [address]` | the reader flags | | read the store the delivery grants, from the publisher's record |
 | `domain-docs <handle@domain>` | `-host URL` | none, required | the overlay host's https base URL, as readers reach it; no path |
 | `domain-docs <handle@domain>` | `-key HEX` | the home's identity | the identity key the handle resolves to |
 | `domain-docs <handle@domain>` | `-out DIR` | `bfinger-site` | where `manifest.json` and `.well-known/metanet-handles/by-handle/<handle>.json` are written; an existing manifest is updated |
