@@ -395,6 +395,18 @@ identity, the reader and the content id, and never the store key. Two
 deliveries of one release are different bytes (nonce, time), and that is the
 deliverer's watermark; the publisher's is the release.
 
+**Handing it over: a BRC-33 message box.** A delivery is binary and goes to
+the reader as a message: `POST /sendMessage` with
+`{message: {recipient: <reader key hex>, messageBox: "bfinger_private_store",
+messageId: <hex of the first 16 bytes of SHA-256(delivery)>, body: <base64 of
+the delivery>}}`, mutually authenticated (BRC-103/104) as the deliverer. The
+reader lists the box (`/listMessages`), keeps each message that opens as a
+delivery for it, and acknowledges those (`/acknowledgeMessage`); anything else
+stays. The message id makes a resend one message. The server learns who sent
+how much to whom and nothing inside. A box that asks to be paid is refused,
+never paid. Any other channel works as well, since the delivery is the whole
+of what the reader needs.
+
 A reader that does not know `leaf` keeps it and reports the store unsupported,
 the rule above; one that knows it and holds no store key reports the store
 committed to and not linked. A host carries the member verbatim
@@ -643,6 +655,8 @@ Frozen by the first private store handed out:
   `carrierKey`, `salt` and `contentKey`, and version `1`;
 - both envelopes' members, domain strings, protocols and key ids, and
   version `1`;
+- the message box name `bfinger_private_store`, the message id and the base64
+  body;
 - key 13 and the seal's member names and values; the segment numbering
   (members from 0, the manifest at `count`); the inner map's keys `body`,
   `originator` and `sig`; the originator derivation and digest.

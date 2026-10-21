@@ -76,6 +76,7 @@ this notice does not modify those licenses.
   github.com/stretchr/testify                  MIT License
   go.yaml.in/yaml/v3                           MIT License, Apache License 2.0
   golang.org/x/crypto                          BSD License
+  golang.org/x/net                             BSD License
 
 Two DIRECT dependencies, github.com/lightwebinc/bcommon and
 github.com/bsv-blockchain/go-sdk, are a rule this repository enforces in
@@ -83,9 +84,10 @@ CI, and they are why the list is short. bcommon is Lightweb Inc.'s
 library of the generic building blocks bfinger is made from, published
 separately under Apache-2.0; CI also asserts that its own only direct
 dependency is go-sdk, so it adds no module of its own. That is not why
-the list is seven lines rather than two: go-sdk brings the other five
-with it, four imported by its own packages and go.yaml.in/yaml/v3
-through testify, and a statically linked binary contains them whether
+the list is eight lines rather than two: go-sdk brings the other six
+with it, five imported by its own packages (golang.org/x/net by its
+mutual-authentication client, which the message box client uses) and
+go.yaml.in/yaml/v3 through testify, and a statically linked binary contains them whether
 they were asked for directly or not. The direct/indirect distinction is
 a dependency-management idea and has no bearing on what is inside the
 artefact.

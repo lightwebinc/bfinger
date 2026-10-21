@@ -40,6 +40,9 @@ type Config struct {
 	Network string
 	// Facade is the bridge facade base URL for publishing objects.
 	Facade string
+	// MessageBox is the BRC-33 message box server private store deliveries
+	// are sent through and taken from. Empty: deliveries are files.
+	MessageBox string
 	// Settle is the settlement leg, as publish.ParseSettler reads it:
 	// "arcade:main", "arcade:test" or "arcade:<url>" for an arcade
 	// installation, "arc:<url>" for an ARC one, "rpc:<url>" for a node with
@@ -121,7 +124,7 @@ func Defaults() Config {
 // in it is an error: a misspelt key that was silently ignored would leave a
 // setting at its default with no sign that the file was ever read.
 var Keys = []string{"home", "host", "header_url", "network", "facade", "settle", "rpc", "rpc_user", "rpc_pass", "asset", "topic", "known_keys", "timeout", "quorum", "originator", "wallet", "wallet_url", "funding", "proofs", "arcade_key",
-	"chain", "woc_key", "fund_unmined", "fee_rate", "fee_source", "fee_floor", "fee_dust", "fee_min_rate", "fee_max_rate", "fee_max_tx", "fee_policy_urls"}
+	"chain", "woc_key", "fund_unmined", "fee_rate", "fee_source", "fee_floor", "fee_dust", "fee_min_rate", "fee_max_rate", "fee_max_tx", "fee_policy_urls", "messagebox"}
 
 // DefaultHeaderURL is the header source used when none is set: the public
 // WhatsOnChain service for main and test, and none for regtest (a private
@@ -244,6 +247,8 @@ func (c Config) apply(vals map[string]string) (Config, error) {
 			c.Network = v
 		case "facade":
 			c.Facade = v
+		case "messagebox":
+			c.MessageBox = v
 		case "settle":
 			c.Settle = v
 		case "rpc":

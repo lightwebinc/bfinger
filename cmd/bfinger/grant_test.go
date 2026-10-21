@@ -1,11 +1,19 @@
 package main
 
 import (
+	"context"
+	"encoding/hex"
 	"encoding/json"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/bsv-blockchain/go-sdk/wallet"
+
+	"github.com/lightwebinc/bfinger/internal/messagebox"
+	"github.com/lightwebinc/bfinger/internal/messagebox/mbtest"
 )
 
 // D7: the publisher grants one reader a private store; the delivery opens
@@ -53,5 +61,56 @@ func TestGrantDeliversAPrivateStoreToOneReader(t *testing.T) {
 	eve.must("open", dv, "-yes")
 	if !strings.Contains(eve.stdout, "for bob only") || !strings.Contains(eve.stderr, "delivered by "+abbrev(host.identity())) {
 		t.Fatalf("eve via the host:\n%s\n%s", eve.stdout, eve.stderr)
+	}
+}
+
+// D10: the delivery reaches the reader through a BRC-33 message box. The
+// publisher sends it to the reader's box; the reader takes it with inbox,
+// which keeps it, acknowledges it, and leaves a message that is not a
+// delivery for them where it was.
+func TestGrantThroughAMessageBox(t *testing.T) {
+	srv := mbtest.NewServer()
+	hs := httptest.NewServer(srv)
+	t.Cleanup(hs.Close)
+	real := newMessageBox
+	newMessageBox = func(base string, w wallet.Interface) *messagebox.Client {
+		id, err := w.GetPublicKey(context.Background(), wallet.GetPublicKeyArgs{IdentityKey: true}, "bfinger")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return &messagebox.Client{Base: base, Fetch: mbtest.As(base, hex.EncodeToString(id.PublicKey.Compressed()))}
+	}
+	t.Cleanup(func() { newMessageBox = real })
+
+	e := newE2EHome(t)
+	e.must("create", "alice@example.com", "-set", "status=one", "-private", "note=through the box", "-yes")
+	bob := e.peer()
+	e.must("grant", "note", bob.identity(), "-messagebox", hs.URL)
+	if !strings.Contains(e.stdout, "sent to") {
+		t.Fatalf("grant:\n%s", e.stdout)
+	}
+	// Something else in bob's box, which inbox must leave alone.
+	if err := (&messagebox.Client{Base: hs.URL, Fetch: mbtest.As(hs.URL, e.identity())}).Send(context.Background(), bob.identity(), deliveryBox, "junk", "bm90IGEgZGVsaXZlcnk="); err != nil {
+		t.Fatal(err)
+	}
+
+	bob.must("inbox", "-messagebox", hs.URL)
+	if !strings.Contains(bob.stderr, "message junk") || !strings.Contains(bob.stdout, "delivery from") {
+		t.Fatalf("inbox:\n%s\n%s", bob.stdout, bob.stderr)
+	}
+	var path string
+	for _, l := range strings.Split(bob.stdout, "\n") {
+		if i := strings.Index(l, " written to "); i >= 0 {
+			path = strings.TrimSuffix(strings.Fields(l[i+len(" written to "):])[0], ";")
+		}
+	}
+	bob.must("open", path, "-yes")
+	if !strings.Contains(bob.stdout, "through the box") {
+		t.Fatalf("open:\n%s", bob.stdout)
+	}
+	// Acknowledged: a second inbox takes nothing new, and the junk stays.
+	bob.must("inbox", "-messagebox", hs.URL)
+	if strings.Contains(bob.stdout, "delivery from") || !strings.Contains(bob.stderr, "message junk") {
+		t.Fatalf("second inbox:\n%s\n%s", bob.stdout, bob.stderr)
 	}
 }

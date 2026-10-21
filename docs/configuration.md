@@ -83,6 +83,7 @@ settlement leg and fee policy.
 | `quorum` | `-quorum` | `1` | lookups: how many hosts must answer identically ([host selection](host-selection.md)) |
 | `timeout` | `-timeout` | `15s` | every request, as a Go duration |
 | `facade` | none | none | every sending command and `publish -resume`: the overlay host base URL the objects are posted to (`<facade>/submit`), or several separated by commas, each sent every object (an object counts once one took it; each that missed it is named on stderr). `publish -facade` overrides it for one run |
+| `messagebox` | none | none | `grant`, `deliver` and `inbox`: the BRC-33 message box server private store deliveries are sent through and taken from |
 | `settle` | none | `arcade:main` on `main`, `arcade:test` on `test`; none on `regtest` | every sending command, see [Settlement legs](#settlement-legs) |
 | `arcade_key` | none | none | bearer token for an `arcade:` or `arc:` leg, sent nowhere else |
 | `proofs` | none | `wait` | `wait`: a transition returns once its token is mined and proven (a wait that runs out after the token was sent continues as `async`). `async`: once the network has accepted it; a later command collects the proof. `async` refuses `settle = tcp:` unless `funding = wallet` |
@@ -298,6 +299,7 @@ without `-yes` or with `-dry-run` (exit 2).
 | `grant <store> <reader>` | `-release-only` | `false` | write the release alone, for a host to deliver; otherwise a delivery from this home |
 | `grant`, `deliver <release>` | `-out FILE` | under `releases/` or `deliveries/` in the home | where the file goes |
 | `open <delivery> [address]` | the reader flags | | read the store the delivery grants, from the publisher's record |
+| `grant`, `deliver`, `inbox` | `-messagebox URL` | the `messagebox` key | send the delivery to the reader's box; `inbox` takes this identity's deliveries from it |
 | `domain-docs <handle@domain>` | `-host URL` | none, required | the overlay host's https base URL, as readers reach it; no path |
 | `domain-docs <handle@domain>` | `-key HEX` | the home's identity | the identity key the handle resolves to |
 | `domain-docs <handle@domain>` | `-out DIR` | `bfinger-site` | where `manifest.json` and `.well-known/metanet-handles/by-handle/<handle>.json` are written; an existing manifest is updated |

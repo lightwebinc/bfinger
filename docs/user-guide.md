@@ -678,6 +678,14 @@ can do the delivering instead: `grant note bob@example.org -release-only`
 writes the release, and the host runs `bfinger deliver release.bfr`; the host
 learns who was granted what, never the key.
 
+To hand a delivery over through a BRC-33 message box instead of by hand, add
+`-messagebox https://messagebox.example.com` to `grant` or `deliver` (or set
+the `messagebox` key): it is sent to the reader's box, authenticated as you.
+The reader runs `bfinger inbox -messagebox https://messagebox.example.com`,
+which writes each delivery for them under `~/.bfinger/deliveries/` and
+acknowledges it, then `bfinger open` on the file. A box that wants payment is
+refused, never paid.
+
 `UNSUPPORTED` on a store means the reader lacks a store feature; a reader too
 old for stores refuses the record with
 `REFUSED-DECODE ... field has the wrong shape: ref`. Both are cured by

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -9,7 +11,12 @@ import (
 	"path/filepath"
 	"time"
 
+	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 	"github.com/bsv-blockchain/go-sdk/transaction"
+	"github.com/bsv-blockchain/go-sdk/wallet"
+
+	"github.com/lightwebinc/bfinger/internal/messagebox"
+	"github.com/lightwebinc/bfinger/internal/publisher/bwallet"
 
 	"github.com/lightwebinc/bfinger/internal/protocol/carrier"
 	"github.com/lightwebinc/bfinger/internal/protocol/private"
@@ -21,6 +28,25 @@ func init() {
 	ownerCommands["grant"] = cmdGrant
 	ownerCommands["deliver"] = cmdDeliver
 	ownerCommands["open"] = cmdOpen
+	ownerCommands["inbox"] = cmdInbox
+}
+
+// deliveryBox is the BRC-33 message box private store deliveries go to.
+const deliveryBox = "bfinger_private_store"
+
+// newMessageBox is the message box client for a server, authenticated as w.
+// A variable so a test can stand in for the server.
+var newMessageBox = func(base string, w wallet.Interface) *messagebox.Client { return messagebox.New(base, w) }
+
+// sendDelivery hands a delivery to its reader's box on the message box at
+// base, under the delivery's hash as its message id, so sending it twice
+// is one message.
+func sendDelivery(ctx context.Context, g *global, base string, sg *bwallet.Signer, reader *ec.PublicKey, dv []byte, hash [32]byte) error {
+	mb := newMessageBox(base, sg)
+	if err := mb.Send(ctx, hex.EncodeToString(reader.Compressed()), deliveryBox, hex.EncodeToString(hash[:16]), base64.StdEncoding.EncodeToString(dv)); err != nil {
+		return fmt.Errorf("the delivery is written, and sending it failed: %w", err)
+	}
+	return nil
 }
 
 // Where the envelopes this home makes are kept, 0600 like the keys they
@@ -87,6 +113,7 @@ func cmdGrant(ctx context.Context, g *global, args []string, stdout, stderr *os.
 	fs.SetOutput(stderr)
 	releaseOnly := fs.Bool("release-only", false, "write the release alone, for a host to deliver")
 	out := fs.String("out", "", "file to write (default under the home)")
+	box := fs.String("messagebox", g.cfg.MessageBox, "also send the delivery to the reader's box on this BRC-33 message box server")
 	pos, err := collectPositional(fs, args)
 	if err != nil {
 		return err
@@ -157,6 +184,12 @@ func cmdGrant(ctx context.Context, g *global, args []string, stdout, stderr *os.
 		return err
 	}
 	fmt.Fprintf(stdout, "delivery of %q for %s written to %s; the reader opens it with bfinger open\n", store.Name, label, path)
+	if *box != "" {
+		if err := sendDelivery(ctx, g, *box, sg, reader, dv, hash); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "sent to %s's box at %s; the reader takes it with bfinger inbox\n", label, *box)
+	}
 	return nil
 }
 
@@ -167,12 +200,13 @@ func cmdDeliver(ctx context.Context, g *global, args []string, stdout, stderr *o
 	fs := flag.NewFlagSet("deliver", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	out := fs.String("out", "", "file to write (default under the home)")
+	box := fs.String("messagebox", g.cfg.MessageBox, "also send the delivery to the reader's box on this BRC-33 message box server")
 	pos, err := collectPositional(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(pos) != 1 {
-		return usage("deliver <release FILE> [-out FILE]")
+		return usage("deliver <release FILE> [-out FILE] [-messagebox URL]")
 	}
 	rel, err := os.ReadFile(pos[0])
 	if err != nil {
@@ -198,6 +232,72 @@ func cmdDeliver(ctx context.Context, g *global, args []string, stdout, stderr *o
 		return err
 	}
 	fmt.Fprintf(stdout, "delivery for %s of content %x written to %s\n", abbrev(hex.EncodeToString(info.Reader.Compressed())), info.ContentID[:8], path)
+	if *box != "" {
+		if err := sendDelivery(ctx, g, *box, sg, info.Reader, dv, hash); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "sent to the reader's box at %s\n", *box)
+	}
+	return nil
+}
+
+const inboxHelp = `usage: bfinger inbox [-messagebox URL]
+
+Take every private store delivery waiting in this identity's box on a BRC-33
+message box server: each is checked to open for this identity, written under
+deliveries/ in the home, and acknowledged so the server drops it. Open one
+with bfinger open. A message that does not open is left in the box and named.`
+
+func cmdInbox(ctx context.Context, g *global, args []string, stdout, stderr *os.File) error {
+	if helped(args, stdout, inboxHelp) {
+		return nil
+	}
+	fs := flag.NewFlagSet("inbox", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	box := fs.String("messagebox", g.cfg.MessageBox, "the BRC-33 message box server")
+	pos, err := collectPositional(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(pos) != 0 {
+		return usage("inbox [-messagebox URL]")
+	}
+	if *box == "" {
+		return usage("inbox needs a message box: -messagebox URL, or the messagebox key")
+	}
+	sg, _, err := g.signer(ctx)
+	if err != nil {
+		return err
+	}
+	mb := newMessageBox(*box, sg)
+	msgs, err := mb.List(ctx, deliveryBox)
+	if err != nil {
+		return err
+	}
+	var taken []string
+	for _, m := range msgs {
+		dv, err := base64.StdEncoding.DecodeString(m.Body)
+		if err == nil {
+			_, err = private.OpenDelivery(ctx, sg, g.cfg.Originator, dv)
+		}
+		if err != nil {
+			fmt.Fprintf(stderr, "message %s from %s: not a delivery for this identity (%v); left in the box\n", safeLabel(m.MessageID), abbrev(m.Sender), err)
+			continue
+		}
+		hash := sha256.Sum256(dv)
+		path := filepath.Join(g.cfg.Home, deliveryDir, fmt.Sprintf("inbox-%x.bfd", hash[:8]))
+		if err := writePrivateFile(path, dv); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "delivery from %s written to %s; open it with bfinger open\n", abbrev(m.Sender), path)
+		taken = append(taken, m.MessageID)
+	}
+	if err := mb.Acknowledge(ctx, deliveryBox, taken); err != nil {
+		return fmt.Errorf("the deliveries are written, and acknowledging them failed (the next inbox takes them again): %w", err)
+	}
+	if len(msgs) == 0 {
+		fmt.Fprintln(stdout, "no deliveries waiting")
+	}
 	return nil
 }
 
