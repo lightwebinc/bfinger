@@ -90,9 +90,11 @@ $ docker compose exec host node -e 'fetch("http://localhost:8080/admin/startGASP
 ```
 
 `"no-peers"` means `OVERLAY_SYNC_PEERS` did not reach the host. The peer sends
-unspent outputs only: every carrier, but only each identity's current token.
+unspent outputs only: every carrier (carriers are never spent) and each
+identity's current token, but no earlier token. Record history therefore does
+move between hosts; only the spent tokens do not, and no reader needs them.
 After the resulting `no-current` refusals settle, `ls_finger` rebuilds each
-chain from its index without a restart (see
+chain from its carriers without a restart (see
 [host/README.md](../host/README.md#restore-and-catch-up)).
 
 ## 3. Make your domain answer
@@ -153,7 +155,10 @@ BFINGER_FACADE=https://finger.example.com
 BFINGER_PROOFS=async
 ```
 
-`FACADE` is the host's base URL (bfinger posts to its `/submit`).
+`FACADE` is the host's base URL (bfinger posts to its `/submit`); several,
+comma-separated, put every object on each, which is how a record you publish
+yourself lives on two hosts with no plane between them
+([user guide](user-guide.md#7-asking-more-than-one-host)).
 `BFINGER_SETTLE=arcade:https://arcade.example.com` names your own arcade, or
 `arc:<url>` an ARC installation (`BFINGER_ARCADE_KEY` holds a bearer token if
 it wants one). `PROOFS=async` returns once the network accepts a transaction and

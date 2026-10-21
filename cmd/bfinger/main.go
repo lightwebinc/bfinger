@@ -138,6 +138,9 @@ type global struct {
 	// over https on port 443, which a test can serve only through a client
 	// that dials it somewhere else.
 	discovery *http.Client
+	// stderr is the run's standard error, for notes made below a command,
+	// such as a facade that missed an object. Nil writes nowhere.
+	stderr *os.File
 }
 
 // isCommand reports whether a first word is a command rather than an address.
@@ -230,7 +233,7 @@ func run(args []string, stdout, stderr *os.File) int {
 		fmt.Fprintln(stderr, "bfinger:", err)
 		return 2
 	}
-	g := &global{cfg: cfg, verbose: *verbose, json: *jsonOut}
+	g := &global{cfg: cfg, verbose: *verbose, json: *jsonOut, stderr: stderr}
 
 	rest := fs.Args()
 	if len(rest) == 0 {

@@ -9,7 +9,6 @@ import (
 	"github.com/bsv-blockchain/go-sdk/transaction"
 
 	"github.com/lightwebinc/bcommon/funding"
-	"github.com/lightwebinc/bcommon/publish"
 	"github.com/lightwebinc/bfinger/internal/protocol/record"
 	"github.com/lightwebinc/bfinger/internal/publisher/bwallet"
 	"github.com/lightwebinc/bfinger/internal/publisher/owner"
@@ -36,7 +35,7 @@ func cmdPublish(ctx context.Context, g *global, args []string, stdout, stderr *o
 	fs := flag.NewFlagSet("publish", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	resume := fs.Bool("resume", false, "re-send the object leg for the current state")
-	facade := fs.String("facade", "", "facade base URL (default: config)")
+	facade := fs.String("facade", "", "facade base URL, or several separated by commas (default: config)")
 	if err := fs.Parse(args); err != nil {
 		return helpOrUsage(err, "")
 	}
@@ -58,7 +57,9 @@ func cmdPublish(ctx context.Context, g *global, args []string, stdout, stderr *o
 	// the proven form wherever there is one. Collection re-publishes each
 	// proof it finds, which is also what upgrades the hosts.
 	if l, err := g.plane(); err == nil {
-		l.facade = &publish.Facade{Base: base}
+		if l.facade, err = facadeFor(base, stderr); err != nil {
+			return err
+		}
 		s := &session{g: g, l: l, st: st, stdout: stdout, stderr: stderr}
 		// The pool too, without the keys: change held back until its
 		// parent proved is released here, which is the other half of what
@@ -160,7 +161,10 @@ func cmdPublish(ctx context.Context, g *global, args []string, stdout, stderr *o
 		}
 	}
 	objects = append(objects, object{"carrier " + st.CarrierTxid, cb}, object{"token " + st.TokenTxid, tb})
-	f := &publish.Facade{Base: base}
+	f, err := facadeFor(base, stderr)
+	if err != nil {
+		return err
+	}
 	for _, o := range objects {
 		res, err := f.Submit(ctx, g.cfg.Topic, o.beef)
 		if err != nil {

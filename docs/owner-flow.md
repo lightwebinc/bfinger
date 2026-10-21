@@ -29,9 +29,33 @@ The directory is 0700 and every file bfinger writes in it is 0600.
 | `successor/identity.json` | the next identity key, between `rotate` and the transition that promotes it |
 | `identity-prev-<seq>.json` | a promoted predecessor, kept because the wallet still holds outputs locked to its fund key |
 | `payments/<txid>.json` | a payment notice, what a messagebox would carry |
+| `backup.json` | when the home was last recorded as backed up, and a hash of the witness that copy holds (`doctor -backed-up`) |
 
 The witness in `state.json` is the one secret that is not a key: with the key
 it authorizes exactly one next transition, so it is never printed or served.
+
+## Backing up the home
+
+The home is a single point of failure: it holds the key, the coin and the
+witness, and only the key and the coin can come back from anywhere else. A
+backup is a copy of the whole directory, taken after **every** transition,
+because each transition reveals the witness the previous record committed to.
+A copy from before the latest transition holds a revealed witness: restored,
+the next transition would reveal it a second time, every reader refuses that,
+and the identity is frozen at its last record. Without the copy the result is
+the same.
+
+`doctor -backed-up` records that a copy was just taken (`backup.json`: the
+time, the sequence, and a domain-separated hash of the witness, never the
+witness). `doctor` then reports `backup current` while the recorded copy holds
+the current witness, `backup STALE` once a transition has moved on, and, with
+nothing recorded, the home path and sequence to copy. Each transition ends with
+a reminder on stderr. The copy holds the identity key, so it needs the same
+care as the home.
+
+What survives a lost or stale copy: the key alone retracts every record
+(`kill -recover`, below). Publishing again under the same identity does not;
+that needs the witness.
 
 ## Commands
 
@@ -119,7 +143,8 @@ the order and what each step leaves behind.
    names a token already spent.
 6. **Object leg**: any store carriers, the carrier's atomic BEEF (with its
    funding parent's proof, or its ancestry while unmined), then the token's, to
-   the facade. A 200 that admits nothing is either already held or refused,
+   the facade (to each facade, when `facade` lists several; an object counts
+   once one took it, and each that missed it is named). A 200 that admits nothing is either already held or refused,
    so bfinger asks the lookup host (`host`, else the manifest's `ls_finger`)
    for the carrier or token: held is `DUPLICATE`, not held is an error. If a
    post fails, `publish -resume` re-sends them from the state.
@@ -169,3 +194,15 @@ with `wallet = wire`.
 - `kill -confirm KILL -yes`: one mined sweep per tree in `trees`, rotations
   included, every output used or not, published to the topic
   ([flows.md 11](flows.md#11-retire-and-kill)).
+- `kill -confirm KILL -recover [address] -yes`: for a home that lost
+  `state.json`, or was restored from a copy older than its latest tree. It
+  asks the lookup host (`host`, else the address's manifest) for the
+  identity's current outputs under every key the home holds, follows each
+  record's `prev` back to the create (a rotation's earlier records are asked
+  for under the key that published them) and each store's head and members,
+  and reads the funding tree out of every carrier's BEEF. A tree is kept as
+  far as its outputs are funding outputs under the key of the one a carrier
+  spent; trees the state does not list are added to it, and the kill sweeps
+  them all. Nothing the host says is trusted: a tree this home holds no key
+  for is named and skipped, and a sweep of anything else fails at settlement.
+  A tree minted and never spent by any carrier is not found.

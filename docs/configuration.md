@@ -82,7 +82,7 @@ settlement leg and fee policy.
 | `known_keys` | `-known-keys` | `<home>/known_keys` | the pin store ([format](known-keys.md)) |
 | `quorum` | `-quorum` | `1` | lookups: how many hosts must answer identically ([host selection](host-selection.md)) |
 | `timeout` | `-timeout` | `15s` | every request, as a Go duration |
-| `facade` | none | none | every sending command and `publish -resume`: the overlay host base URL the objects are posted to (`<facade>/submit`). `publish -facade` overrides it for one run |
+| `facade` | none | none | every sending command and `publish -resume`: the overlay host base URL the objects are posted to (`<facade>/submit`), or several separated by commas, each sent every object (an object counts once one took it; each that missed it is named on stderr). `publish -facade` overrides it for one run |
 | `settle` | none | `arcade:main` on `main`, `arcade:test` on `test`; none on `regtest` | every sending command, see [Settlement legs](#settlement-legs) |
 | `arcade_key` | none | none | bearer token for an `arcade:` or `arc:` leg, sent nowhere else |
 | `proofs` | none | `wait` | `wait`: a transition returns once its token is mined and proven (a wait that runs out after the token was sent continues as `async`). `async`: once the network has accepted it; a later command collects the proof. `async` refuses `settle = tcp:` unless `funding = wallet` |
@@ -286,14 +286,16 @@ without `-yes` or with `-dry-run` (exit 2).
 | `retire` | `-yes`, `-dry-run` | `false` | as above |
 | `kill` | `-confirm KILL` | none, required | compared literally |
 | `kill` | `-yes` | `false` | **enables the spend**; without it each sweep's hex is printed and nothing is sent |
+| `kill` | `-recover [address]` | `false` | find the funding trees at the lookup host (`host`, else the one the address's manifest names) and add those the state lacks; for a home that lost `state.json` or was restored from a stale copy |
+| `doctor` | `-backed-up` | `false` | record that the home was just copied, so later runs report whether that copy still holds the current witness |
 | `pay <acct\|key> <sats>` | `-yes`, `-dry-run` | `false` | as above |
 | `publish` | `-resume` | `false`, required | re-send the object leg for the current state |
-| `publish` | `-facade URL` | the `facade` key | send to another facade for this run |
+| `publish` | `-facade URL` | the `facade` key | send to another facade, or a comma-separated list, for this run |
 | `domain-docs <handle@domain>` | `-host URL` | none, required | the overlay host's https base URL, as readers reach it; no path |
 | `domain-docs <handle@domain>` | `-key HEX` | the home's identity | the identity key the handle resolves to |
 | `domain-docs <handle@domain>` | `-out DIR` | `bfinger-site` | where `manifest.json` and `.well-known/metanet-handles/by-handle/<handle>.json` are written; an existing manifest is updated |
 | `serve-wallet` | `-listen ADDR` | `127.0.0.1:3301` | must be a loopback address |
-| `init`, `doctor`, `receive <notice>` | none | | each answers `-h` and `help` without doing any work |
+| `init`, `receive <notice>` | none | | each answers `-h` and `help` without doing any work, as `doctor` does |
 
 [examples.md](examples.md) shows the commands with their output, and
 [self-host.md](self-host.md) uses `domain-docs`.

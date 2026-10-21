@@ -98,7 +98,11 @@ func (g *global) plane() (*endpoints, error) {
 	if err != nil {
 		return nil, usage(fmt.Sprintf("settle must be arcade:main, arcade:test, arcade:<url> (an arcade installation), arc:<url> (an ARC installation), rpc:<url> (node with acknowledgement) or tcp:<host:port> (bare EF to the ingress): %v", err))
 	}
-	l := &endpoints{chain: chain, node: g.nodeAsset(), settle: settle, arcade: arcade, facade: &publish.Facade{Base: g.cfg.Facade}}
+	facade, err := facadeFor(g.cfg.Facade, g.stderr)
+	if err != nil {
+		return nil, err
+	}
+	l := &endpoints{chain: chain, node: g.nodeAsset(), settle: settle, arcade: arcade, facade: facade}
 	kind, _, _ := strings.Cut(spec, ":")
 	// Not waiting for a block is only safe when something has said the
 	// network took the transaction. The bare ingress answers nothing, so
@@ -177,11 +181,17 @@ Create the identity this home directory publishes under, and print its key,
 its fingerprint and the address its funding is mined to. If an identity
 already exists it is left alone and printed instead.`
 
-const doctorHelp = `usage: bfinger doctor
+const doctorHelp = `usage: bfinger doctor [-backed-up]
 
 Report local state and reachability: the identity, the funding pool, what was
-last published, the pin store, the header source, the node, the facade and the
-journal. Reads only. It publishes nothing and spends nothing.`
+last published, whether the last recorded backup of this home still holds the
+current witness, the pin store, the header source, the node, the facade and
+the journal. It publishes nothing and spends nothing.
+
+  -backed-up   record that this home was just copied somewhere safe, so a
+               later doctor can say when that copy has gone stale (the only
+               file doctor writes; it holds a hash of the witness, never the
+               witness)`
 
 func cmdInit(ctx context.Context, g *global, args []string, stdout, stderr *os.File) error {
 	// Before anything touches the disk. This command creates a key, so a help
@@ -1243,6 +1253,8 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 		where = "accepted, proof pending"
 	}
 	fmt.Fprintf(s.stdout, "%s seq %d %s\n  token   %s (%s)\n  carrier %s\n", s.st.Acct, rec.Seq, kindName(rec.Kind), s.st.TokenTxid, where, s.st.CarrierTxid)
+	// The witness just changed, so every earlier copy of the home is stale.
+	s.say("backup: the witness changed; copy %s to your backup now, then run bfinger doctor -backed-up", s.g.cfg.Home)
 	return nil
 }
 
@@ -1755,6 +1767,26 @@ func cmdDoctor(ctx context.Context, g *global, args []string, stdout, stderr *os
 	if helped(args, stdout, doctorHelp) {
 		return nil
 	}
+	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	backedUp := fs.Bool("backed-up", false, "record that this home was just backed up")
+	if err := fs.Parse(args); err != nil {
+		return helpOrUsage(err, "doctor [-backed-up]")
+	}
+	if fs.NArg() != 0 {
+		return usage("doctor [-backed-up]")
+	}
+	if *backedUp {
+		st, err := owner.Load(g.cfg.Home)
+		if err != nil {
+			return err
+		}
+		b, err := owner.RecordBackup(g.cfg.Home, st, time.Now())
+		if err != nil {
+			return &exitError{1, "doctor -backed-up: " + err.Error()}
+		}
+		fmt.Fprintf(stdout, "backup      recorded at seq %d, %s\n", b.Seq, b.At.Format(time.RFC3339))
+	}
 	fmt.Fprintf(stdout, "home        %s\n", g.cfg.Home)
 	sg, pool, err := g.signer(ctx)
 	if err != nil {
@@ -1773,6 +1805,7 @@ func cmdDoctor(ctx context.Context, g *global, args []string, stdout, stderr *os
 		fmt.Fprintln(stdout, "state       never published")
 	} else {
 		fmt.Fprintf(stdout, "state       %s seq %d %s token %s carrier %s\n", st.Acct, st.Seq, kindName(st.Kind), st.TokenTxid, st.CarrierTxid)
+		fmt.Fprintln(stdout, backupLine(g.cfg.Home, st))
 		if st.PendingSuccessor != "" {
 			fmt.Fprintf(stdout, "rotation    PENDING to %s; publish one transition to complete it\n", st.PendingSuccessor)
 		}
@@ -1918,6 +1951,28 @@ func cmdDoctor(ctx context.Context, g *global, args []string, stdout, stderr *os
 	return nil
 }
 
+// backupLine is doctor's report on the home's last recorded backup. The
+// witness is the one thing in the home nothing else can rebuild, and a copy
+// holding an older one is no copy: every transition reveals the witness the
+// record before it committed to, so restoring a stale copy leaves a home that
+// can never publish again. Hence the line compares witnesses, not dates.
+func backupLine(home string, st *owner.State) string {
+	b, err := owner.LoadBackup(home)
+	switch {
+	case err != nil:
+		return fmt.Sprintf("backup      unreadable: %v", err)
+	case st.WitnessHex == "":
+		return "backup      no witness in the state; nothing to back up but the key"
+	case b == nil:
+		return fmt.Sprintf("backup      NONE RECORDED: copy %s somewhere safe (seq %d), then run bfinger doctor -backed-up", home, st.Seq)
+	case b.Current(st):
+		return fmt.Sprintf("backup      current: recorded %s at seq %d, holds this witness", b.At.Format(time.RFC3339), b.Seq)
+	default:
+		return fmt.Sprintf("backup      STALE: recorded %s at seq %d, the home is at seq %d; a restore from it holds a revealed witness and could never publish again. Copy %s again, then run bfinger doctor -backed-up",
+			b.At.Format(time.RFC3339), b.Seq, st.Seq, home)
+	}
+}
+
 // cmdKill is the kill switch: one mined transaction per funding tree,
 // spending every output the tree has, used and unused, so every carrier this
 // identity ever funded becomes a double spend. The sweeps are published to
@@ -1929,11 +1984,13 @@ func cmdKill(ctx context.Context, g *global, args []string, stdout, stderr *os.F
 	fs.SetOutput(stderr)
 	confirm := fs.String("confirm", "", "must be the literal KILL")
 	yes := fs.Bool("yes", false, "actually mine and publish")
-	if err := fs.Parse(args); err != nil {
-		return helpOrUsage(err, "")
+	recoverTrees := fs.Bool("recover", false, "find the funding trees at a host, for a home that lost its state")
+	pos, err := collectPositional(fs, args)
+	if err != nil {
+		return err
 	}
-	if fs.NArg() != 0 {
-		return usage("kill -confirm KILL [-yes]")
+	if len(pos) > 1 || (len(pos) == 1 && !*recoverTrees) {
+		return usage("kill -confirm KILL [-recover [address]] [-yes]")
 	}
 	if *confirm != "KILL" {
 		return usage("kill sweeps every funding tree and retracts every record; pass -confirm KILL")
@@ -1943,8 +2000,20 @@ func cmdKill(ctx context.Context, g *global, args []string, stdout, stderr *os.F
 	if err != nil {
 		return err
 	}
+	if *recoverTrees {
+		acct := ""
+		if len(pos) == 1 {
+			acct = pos[0]
+		}
+		if err := s.recoverForKill(ctx, acct); err != nil {
+			return err
+		}
+	}
 	if s.st == nil || len(s.st.Trees) == 0 {
-		return &exitError{1, "no funding trees recorded; nothing to sweep"}
+		if *recoverTrees {
+			return &exitError{1, "the host knows no funding tree this home holds a key for; nothing to sweep"}
+		}
+		return &exitError{1, "no funding trees recorded; nothing to sweep (a home that lost its state: kill -recover)"}
 	}
 	for _, tr := range s.st.Trees {
 		sweep, fresh, err := s.sweepFor(ctx, tr, tf, stdout)

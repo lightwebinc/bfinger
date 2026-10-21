@@ -381,6 +381,22 @@ identity can also be read by key, with no domain, and `-host` (or `host` in
 the config) is then required:
 `bfinger -host https://finger.example.com 02abab…abab`.
 
+**Two hosts you do not run.** A host may decline you, rate-limit you, charge
+or delete, so a record that matters should live on at least two hosts run by
+different people. Publish to both: `facade` takes several base URLs separated
+by commas (`facade = https://finger.example.com, https://finger.example.net`),
+each object goes to every one, and a facade that missed an object is named on
+stderr while the others still count it published;
+`publish -resume -facade URL` seeds it later. Your manifest names one of
+them for `ls_finger` (a manifest names one base URL per service); a reader
+reaches the other with `-host`, and comparing the two answers is how a fork
+between them shows. `-quorum 2` makes that comparison for you when the hosts
+answer under one name (several A or AAAA records), which needs both operators
+to serve that name; with two independent names, ask each. Hosts can also fill each other by
+GASP ([self-host.md](self-host.md#catching-up-from-another-host)), but that is
+their operators' setting, not yours: publishing to each yourself is what does
+not depend on them.
+
 ## 8. Publishing your own
 
 **Standing warning.** `create`, `status`, `rotate`, `retire`, `kill` and `pay`
@@ -458,12 +474,38 @@ fund address <base58 address>
 ```
 
 `init` never overwrites an identity; run again, it prints the existing one.
-Files are 0600, a directory it creates 0700. Back the home up before
-publishing: `identity.json` is the identity, `wallet.json` the coin, and
-`state.json` holds the witness, the one secret that is not a key. Under
+Files are 0600, a directory it creates 0700. Under
 `wallet = wire` the key is the wallet's, there is no `identity.json`, and
 `init` prints `created <home> for the wire wallet at <url>`. File layout:
 [docs/owner-flow.md](owner-flow.md).
+
+### Backing up your home
+
+The home is the one part of an identity the network cannot rebuild:
+`identity.json` is the identity, `wallet.json` the coin, and `state.json`
+holds the witness, the one secret that is not a key. Every transition
+reveals the witness the record before it committed to and makes a new one,
+so **copy the home after every transition**, not once. A copy taken before
+the latest transition holds a witness that is already public: restored, it
+can never publish again, and the identity is frozen at its last record.
+
+```console
+$ cp -a ~/.bfinger /media/backup/bfinger-home
+$ bfinger doctor -backed-up
+backup      recorded at seq 7, 2026-01-01T12:00:00Z
+```
+
+`doctor -backed-up` records which witness the copy holds (a hash of it, never
+the witness). From then on `doctor` says `backup current` while the copy holds
+the current witness, and `backup STALE` once a transition has moved on; with
+nothing recorded it prints the home path and sequence to copy. Each transition
+ends by reminding you on stderr. Keep the copy as private as the home itself:
+it holds the key.
+
+What a copy that is stale, or lost, still lets you do: with the key alone you
+can retract every record (`kill -recover`, under
+[Retiring and killing](#retiring-and-killing)). It cannot let you publish
+again; that takes the current witness.
 
 ### Putting coin in the wallet
 
@@ -655,6 +697,16 @@ publishes it. Every carrier those trees funded becomes a double spend, hosts
 drop the records, and readers get `NO-TOKEN`. Without `-yes` (under
 `funding = home`) it prints each sweep and sends nothing. Mechanics and
 recovery: [docs/owner-flow.md](owner-flow.md).
+
+`kill` sweeps the trees `state.json` lists. A home that lost its state, or was
+restored from a copy older than its latest tree, adds `-recover`:
+`bfinger kill -confirm KILL -recover [alice@example.com] -yes` asks the lookup
+host (`host`, else the one the address's domain names) for the identity's
+carriers, walks each record back to the create and through its stores, takes
+every funding tree those carriers spent, and sweeps them all. It needs only
+the key, and coin for the fees. A tree no carrier ever spent cannot be found
+this way, and trees locked to a key the home no longer holds are named and
+left.
 
 ## 9. Being findable
 
