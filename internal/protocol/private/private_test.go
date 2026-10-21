@@ -9,7 +9,7 @@ const goodKey = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81
 
 func key() Key {
 	return Key{V: Version, IdentityKey: goodKey, Store: "note", Count: 1,
-		Head: strings.Repeat("ab", 32), CarrierKey: goodKey, Salt: strings.Repeat("5a", 32)}
+		Head: strings.Repeat("ab", 32), CarrierKey: goodKey, Salt: strings.Repeat("5a", 32), ContentKey: strings.Repeat("01", 32)}
 }
 
 func TestStoreKeyRoundTripsAndRefusesBadShapes(t *testing.T) {
@@ -31,6 +31,7 @@ func TestStoreKeyRoundTripsAndRefusesBadShapes(t *testing.T) {
 		"carrier key": func(k *Key) { k.CarrierKey = "nothex" },
 		"head":        func(k *Key) { k.Head = "ab" },
 		"salt":        func(k *Key) { k.Salt = "5a5a" },
+		"content key": func(k *Key) { k.ContentKey = strings.Repeat("00", 32) },
 	} {
 		k := key()
 		mutate(&k)

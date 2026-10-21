@@ -82,8 +82,9 @@ bytes pushed.
 | 10 | `body` | map, text keys | the profile. Encoded size at most 16 KiB (16384 bytes) for kinds 1 to 4, 64 KiB (65536 bytes) for kinds 5 and 6 (§5) |
 | 11 | `refs` | array | store entries `{name, root, count, head?}`, at most 64, §5. May be empty |
 | 12 | `successor` | bytes(33) | rotate only: the next identity key, compressed, in its one encoding |
+| 13 | `seal` | map, text keys | kinds 5 and 6 of a private store only: how the body is sealed (§5) |
 
-Keys 0 to 6 and 8 to 11 are required on every record. Integer keys above 12
+Keys 0 to 6 and 8 to 11 are required on every record. Integer keys above 13
 are unknown to this version: any party that re-encodes a record preserves them
 and any party that reads one ignores them (BRC-174 §3.2's rule; a
 reconstruction that drops a field destroys a future extension invisibly).
@@ -321,6 +322,49 @@ recomputes the salted root (over the manifest's members for `count > 1`) and
 requires it to equal the entry's, then verifies every carrier as a carrier
 under `carrierKey`. The salt is per store, never per reader: the root is one
 value. Whatever differs per reader is in the delivery, not the commitment.
+
+**Sealed content.** Every sub-record of a private store is sealed: the store
+is one BRC-369 content under a content key drawn at random (never derived),
+and each sub-record is one segment of it, a member at its position from 0 and
+the manifest at `count`. The segment is AES-256-GCM under BRC-369's symmetric
+key, IV the 4-byte salt then the segment index as 8 bytes big-endian, no
+associated data, tag last. Its plaintext is a canonical CBOR map: `body`, the
+body the sub-record would carry in the clear (one field named after the
+store, or the manifest's `members`), and on the store's head (its one member,
+or the manifest), when the originator is inside, `originator` (the identity
+key, bytes(33)) and `sig`: a DER signature by the identity under
+`[1, "bfinger seal"]` / `"originator"`, counterparty anyone, over
+`SHA-256("bfinger seal originator v1" || 0x00 || keyCommit || SHA-256(body))`.
+The sealed record's body is exactly `{"sealed": <ciphertext>}`, and key 13 is
+its seal, a map of exactly these members:
+
+| member | type | |
+| --- | --- | --- |
+| `v` | uint | `1` |
+| `alg` | tstr | `"brc369-aes-256-gcm"` |
+| `keyCommit` | bytes(32) | BRC-369 §2.2's commitment to the content key |
+| `contentId` | bytes(32) | `SHA-256(ciphertext)` |
+| `salt` | bytes(4) | the content key's BRC-369 salt |
+| `segment` | uint | this sub-record's segment index |
+| `carrier` | tstr | `"identity"` or `"child"`: whose key the carrier is under |
+| `originator` | tstr | `"inside"` or `"absent"`: whether the head names its signer inside |
+
+A seal on a transition (kinds 1 to 4) is refused, and so is a sealed record
+whose body is anything but the ciphertext.
+
+**Whose key the carriers are under.** With `carrier = "child"` (bfinger's
+default) a private store's carriers are signed and indexed under a key of the
+store's own, which the host has never seen, funded by a tree locked to that
+key and minted for the store alone; the host can say nothing about whose they
+are. With `"identity"` they are the identity's, as a public store's are, and
+the host knows who published them without being able to read them. The
+originator setting is the second, independent dial: inside, the reader learns
+who signed the content and checks it is the identity whose record commits to
+the store; absent, the salted root is the only binding. The store key's
+`carrierKey` names the key either way, and its `contentKey` (bytes(32), hex)
+is the content key. A reader checks the key against `keyCommit` before using
+it, the ciphertext against `contentId`, the segment index against the
+sub-record's position, then the tag, then the originator.
 
 A reader that does not know `leaf` keeps it and reports the store unsupported,
 the rule above; one that knows it and holds no store key reports the store
@@ -567,7 +611,10 @@ Frozen by the first private store handed out:
 - the entry member `leaf` and its value `"salted"`; that a salted leaf is
   `c || salt` with a 32-byte salt per store; that a salted entry names no head;
 - the store key's members `v`, `identityKey`, `store`, `count`, `head`,
-  `carrierKey` and `salt`, and version `1`.
+  `carrierKey`, `salt` and `contentKey`, and version `1`;
+- key 13 and the seal's member names and values; the segment numbering
+  (members from 0, the manifest at `count`); the inner map's keys `body`,
+  `originator` and `sig`; the originator derivation and digest.
 
 Frozen by the lookup service (§14):
 

@@ -72,3 +72,31 @@ func TestRefLeafRefusesWhatItDoesNotRead(t *testing.T) {
 		t.Fatalf("public: %q %v", leaf, err)
 	}
 }
+
+// The sealed golden, from a second encoder: key 13 decodes as the seal, the
+// body is the ciphertext alone, and the record re-encodes to its bytes.
+func TestSealedGoldenRoundTrips(t *testing.T) {
+	want := golden(t, "record-v1-sealed")
+	r, err := Decode(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if r.Seal == nil || r.Seal.Carrier != CarrierChild || r.Seal.Originator != OriginatorInside || r.Seal.Salt != [4]byte{0xaa, 0xaa, 0xaa, 0xaa} || len(r.Unknown) != 0 {
+		t.Fatalf("%+v", r.Seal)
+	}
+	if ct, err := SealedBody(r.Body); err != nil || len(ct) != 48 {
+		t.Fatalf("%v %d", err, len(ct))
+	}
+	got, err := r.Encode()
+	if err != nil || !bytes.Equal(got, want) {
+		t.Fatalf("re-encode differs (%v)", err)
+	}
+	// A seal missing a member, or with one more, is no seal.
+	r.Seal.Alg = "rot13"
+	if _, err := r.Encode(); !errors.Is(err, ErrSeal) {
+		t.Fatalf("unknown alg encoded: %v", err)
+	}
+}

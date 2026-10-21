@@ -456,3 +456,17 @@ test('the private golden keeps the layout member through a re-encode', () => {
   assert.deepEqual(ref.unknown?.map((p) => [p.key, p.val]), [['leaf', 'salted']])
   assert.equal(toHex(encodeRecord(r)), toHex(want), 're-encode differs')
 })
+
+// A sealed sub-record carries its seal under key 13, the first key past the
+// twelve this host defines. The host does not open seals: it must keep the
+// key verbatim and admit the record as the sub-record it is.
+test('the sealed golden keeps key 13 through a re-encode', () => {
+  const want = recordGolden('record-v1-sealed')
+  const r = decodeRecord(want)
+  assert.equal(r.kind, KindSub)
+  assert.equal(r.unknown.length, 1)
+  assert.equal(r.unknown[0]?.key, 13n)
+  assert.ok(r.unknown[0]?.val instanceof CborMap, 'the seal is a map')
+  assert.ok(r.body.get('sealed') instanceof Uint8Array, 'the body is the ciphertext')
+  assert.equal(toHex(encodeRecord(r)), toHex(want), 're-encode differs')
+})

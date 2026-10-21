@@ -230,7 +230,7 @@ func TestChunkStoreFitsTheBoundOnRuneBoundaries(t *testing.T) {
 	}
 
 	// Under the bound is one part and is not chunked at all.
-	one, err := chunkStore("plan", strings.Repeat("a", 1000))
+	one, err := chunkStore("plan", strings.Repeat("a", 1000), 0)
 	if err != nil || len(one) != 1 {
 		t.Fatalf("small store: %d parts, %v", len(one), err)
 	}
@@ -239,7 +239,7 @@ func TestChunkStoreFitsTheBoundOnRuneBoundaries(t *testing.T) {
 	// runes never divide the budget evenly, so at least one boundary is
 	// forced backwards.
 	doc := strings.Repeat("中", record.MaxSubBodyBytes) // 3 bytes each
-	parts, err := chunkStore("doc", doc)
+	parts, err := chunkStore("doc", doc, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,7 +257,7 @@ func TestChunkStoreFitsTheBoundOnRuneBoundaries(t *testing.T) {
 	empty, _ := record.Encode(record.Map{{Key: long, Val: ""}})
 	budget := record.MaxSubBodyBytes - len(empty) - 8
 	for _, n := range []int{budget - 1, budget, budget + 1, budget * 2} {
-		parts, err := chunkStore(long, strings.Repeat("x", n))
+		parts, err := chunkStore(long, strings.Repeat("x", n), 0)
 		if err != nil {
 			t.Fatalf("%d bytes: %v", n, err)
 		}
@@ -268,18 +268,18 @@ func TestChunkStoreFitsTheBoundOnRuneBoundaries(t *testing.T) {
 	}
 
 	// A store too large for a manifest is refused before anything is minted.
-	if _, err := chunkStore("doc", strings.Repeat("x", record.MaxSubBodyBytes*(record.MaxMembers+1))); err == nil {
+	if _, err := chunkStore("doc", strings.Repeat("x", record.MaxSubBodyBytes*(record.MaxMembers+1)), 0); err == nil {
 		t.Fatal("a store past MaxMembers was accepted")
 	}
 	// Store content is not bounded by the reader's DISPLAY caps: a document
 	// is meant to be longer than a screen, and the reader still bounds what
 	// it prints.
-	if _, err := chunkStore("doc", strings.Repeat("line\n", maxBodyLines*3)); err != nil {
+	if _, err := chunkStore("doc", strings.Repeat("line\n", maxBodyLines*3), 0); err != nil {
 		t.Fatalf("a long document was refused at publish: %v", err)
 	}
 	// But a control character is still refused, because a conforming reader
 	// would have to strip it.
-	if _, err := chunkStore("doc", "bad\x07bell"); err == nil {
+	if _, err := chunkStore("doc", "bad\x07bell", 0); err == nil {
 		t.Fatal("a control character was accepted")
 	}
 }

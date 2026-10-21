@@ -276,7 +276,9 @@ without `-yes` or with `-dry-run` (exit 2).
 | `create`, `status`, `rotate` | `-set k=v`, `-set k=@file` | none, repeatable | set a body field, from a file with `@` |
 | `create`, `status`, `rotate` | `-unset k` | none, repeatable | remove a body field |
 | `create`, `status`, `rotate` | `-store name=text`, `-store name=@file` | none, repeatable | publish the value as a sub-record in its own carrier and commit to it from the record |
-| `create`, `status`, `rotate` | `-private name=text`, `-private name=@file` | none, repeatable | publish the value as a private store: salted root, no head; its store key goes to `private/<name>.json` |
+| `create`, `status`, `rotate` | `-private name=text`, `-private name=@file` | none, repeatable | publish the value as a private store: salted root, no head, sealed content; its store key goes to `private/<name>.json` |
+| `create`, `status`, `rotate` | `-carrier-key child\|identity` | `child` | with `-private`: the store's carriers under a key of its own (funding = home only), or under the identity |
+| `create`, `status`, `rotate` | `-originator inside\|absent` | `inside` | with `-private`: whether the sealed content names and is signed by the identity |
 | `create`, `status`, `rotate` | `-unstore name` | none, repeatable | drop a sub-store from the record |
 | `create`, `status`, `rotate` | `-expires DUR` | `0`, unbounded | the validity window's upper bound, from now |
 | `create`, `status`, `rotate` | `-funding-count N` | `16` | outputs per funding tree when one is minted |

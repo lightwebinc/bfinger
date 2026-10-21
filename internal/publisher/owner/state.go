@@ -68,6 +68,15 @@ type Store struct {
 	// the owner hands it out in the store key and re-sends from it.
 	Leaf    string `json:"leaf,omitempty"`
 	SaltHex string `json:"salt,omitempty"`
+	// A private store's carriers are signed under CarrierKey (the identity's
+	// own key, or a key of the store's own), and its content is sealed
+	// under ContentKey, which only this file, the store key and each
+	// reader's release hold. Carrier and Originator are its seal's
+	// attribution settings.
+	CarrierKey string `json:"carrierKey,omitempty"`
+	ContentKey string `json:"contentKey,omitempty"`
+	Carrier    string `json:"carrier,omitempty"`
+	Originator string `json:"originator,omitempty"`
 
 	// The fields a state written before stores could hold more than one
 	// carrier used. They are read and converted by Load, never written.

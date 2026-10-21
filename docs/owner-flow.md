@@ -29,6 +29,8 @@ The directory is 0700 and every file bfinger writes in it is 0600.
 | `successor/identity.json` | the next identity key, between `rotate` and the transition that promotes it |
 | `identity-prev-<seq>.json` | a promoted predecessor, kept because the wallet still holds outputs locked to its fund key |
 | `payments/<txid>.json` | a payment notice, what a messagebox would carry |
+| `private/<name>.json` | the store key of each private store published from here: what opens it |
+| `carrier-keys/<key>.json` | a key a private store's carriers are published under, kept for the kill switch |
 | `backup.json` | when the home was last recorded as backed up, and a hash of the witness that copy holds (`doctor -backed-up`) |
 
 The witness in `state.json` is the one secret that is not a key: with the key

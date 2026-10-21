@@ -57,10 +57,25 @@ func goldens() {
 		10: map[string]any{"status": "available"},
 		11: []any{map[string]any{"name": "note", "root": fill(0x77, 32), "count": uint64(1), "leaf": "salted"}},
 	}
+	// A sealed sub-record: key 13 is the seal, the body is its ciphertext
+	// and nothing else. Key 13 is the first key added after 0 to 12, so it
+	// is what an older host and reader must carry and ignore.
+	sealed := map[int]any{
+		0: []byte("bfr\x01"), 1: idk, 2: uint64(1), 3: uint64(5),
+		4: fill(0x00, 32), 5: fill(0x22, 32), 6: fill(0x33, 32),
+		8: uint64(1700000000), 9: uint64(0),
+		10: map[string]any{"sealed": fill(0xc5, 48)},
+		11: []any{},
+		13: map[string]any{
+			"v": uint64(1), "alg": "brc369-aes-256-gcm",
+			"keyCommit": fill(0x88, 32), "contentId": fill(0x99, 32), "salt": fill(0xaa, 4),
+			"segment": uint64(0), "carrier": "child", "originator": "inside",
+		},
+	}
 	for _, g := range []struct {
 		name string
 		v    any
-	}{{"create", create}, {"update", update}, {"manifest", manifest}, {"private", private}} {
+	}{{"create", create}, {"update", update}, {"manifest", manifest}, {"private", private}, {"sealed", sealed}} {
 		b, err := enc.Marshal(g.v)
 		if err != nil {
 			panic(err)

@@ -657,8 +657,16 @@ record can find or match its carriers; the name is held to
 store, to `~/.bfinger/private/<name>.json` (0600). Hand it to a reader; they
 read the store with `bfinger alice@example.com -open note.json`, which proves
 the store is the one your record commits to before printing it. Without the
-key, the store reads `NO-TOKEN ... open it with -open`. Anyone holding the key
-can read the store, and its carriers are content on the hosts like any other.
+key, the store reads `NO-TOKEN ... open it with -open`.
+
+The store's content is sealed under a key only the store key holds, so the
+hosts carry ciphertext. By default its carriers are signed under a key of the
+store's own (kept in `~/.bfinger/carrier-keys/`, swept by `kill` like your
+own trees), so a host cannot say whose they are; `-carrier-key identity` signs
+them as you. `-originator inside` (the default) puts your identity and
+signature inside the sealed content, which the reader checks against the
+record; `-originator absent` leaves them out. Anyone holding the store key can
+read the store: hand it over as carefully as the content deserves.
 
 `UNSUPPORTED` on a store means the reader lacks a store feature; a reader too
 old for stores refuses the record with

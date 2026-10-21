@@ -70,11 +70,17 @@ is always public.
 - **An unlinked public store is unlisted, not private.** A leaf is the hash of
   a member's carrier txid, and every subscribed host holds that carrier. A host
   can hash an identity's carriers and match any root in its record.
-- **A private store (`-private`) is not matchable.** Its leaves are salted
-  with a secret only its readers are handed, in the store key, and its entry
-  names no head, so a host holding every carrier cannot tell which root they
-  belong to. What a host still sees: that the record commits to a store of
-  that many members, and the carriers themselves.
+- **A private store (`-private`) is not matchable and not readable.** Its
+  leaves are salted with a secret only its readers are handed, in the store
+  key, and its entry names no head, so a host holding every carrier cannot
+  tell which root they belong to. Its content is sealed under a content key
+  only the store key holds. By default its carriers are under a key of the
+  store's own, so the host cannot say whose they are either. What a host still
+  sees: that the record commits to a store of that many members; the sealed
+  carriers and their sizes; and, on chain, that the store's funding tree was
+  paid for from your fund address, which links the two to anyone who follows
+  the coin. `-carrier-key identity` signs the carriers as you instead, and
+  `-originator absent` leaves your signature out of the content.
 
 ## Reading
 

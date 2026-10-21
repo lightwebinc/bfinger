@@ -107,7 +107,9 @@ type Record struct {
 	Body        Map
 	Refs        []Ref
 	Successor   *[33]byte
-	Unknown     Map
+	// Seal is a sealed sub-record's or manifest's seal, key 13.
+	Seal    *Seal
+	Unknown Map
 }
 
 // Encode writes the record in canonical CBOR, checking shape but not the
@@ -153,12 +155,18 @@ func (r *Record) Encode() ([]byte, error) {
 	if r.Successor != nil {
 		m = append(m, Pair{Key: keySuccessor, Val: r.Successor[:]})
 	}
+	if r.Seal != nil {
+		if err := r.Seal.check(); err != nil {
+			return nil, err
+		}
+		m = append(m, Pair{Key: keySeal, Val: r.Seal.encode()})
+	}
 	for _, p := range r.Unknown {
 		k, ok := p.Key.(uint64)
 		if !ok {
 			return nil, fmt.Errorf("%w: unknown key %s", ErrField, typeName(p.Key))
 		}
-		if k <= keySuccessor {
+		if k <= keySeal {
 			return nil, fmt.Errorf("%w: unknown key %d is defined", ErrField, k)
 		}
 		m = append(m, p)
@@ -268,6 +276,10 @@ func Decode(b []byte) (*Record, error) {
 				return nil, fmt.Errorf("%w: successor prefix", ErrField)
 			}
 			r.Successor = &s
+		case keySeal:
+			if r.Seal, err = decodeSeal(p.Val); err != nil {
+				return nil, err
+			}
 		default:
 			r.Unknown = append(r.Unknown, p)
 		}
@@ -319,6 +331,16 @@ func (r *Record) Validate() error {
 	}
 	if r.NotBefore != 0 && r.NotAfter != 0 && r.NotBefore > r.NotAfter {
 		return ErrWindow
+	}
+	// A seal belongs to a sub-record or a manifest, never a transition: a
+	// transition's body is what every reader of the identity reads.
+	if r.Seal != nil {
+		if r.Kind != KindSub && r.Kind != KindManifest {
+			return fmt.Errorf("%w: kind %d carries a seal", ErrKind, r.Kind)
+		}
+		if _, err := SealedBody(r.Body); err != nil {
+			return err
+		}
 	}
 	return nil
 }

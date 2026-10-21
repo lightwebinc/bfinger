@@ -20,6 +20,7 @@ import (
 	ec "github.com/bsv-blockchain/go-sdk/primitives/ec"
 
 	"github.com/lightwebinc/bcommon/guard"
+	"github.com/lightwebinc/bcommon/keyed"
 	"github.com/lightwebinc/bfinger/internal/protocol/record"
 )
 
@@ -44,6 +45,10 @@ type Key struct {
 	// under, hex. The identity's own key, or one the host cannot tie to it.
 	CarrierKey string `json:"carrierKey"`
 	Salt       string `json:"salt"`
+	// ContentKey is the BRC-369 content key every sub-record of the store
+	// is sealed under, hex. It is the one secret here: whoever holds it
+	// reads the store.
+	ContentKey string `json:"contentKey"`
 }
 
 // Parsed is a store key read and checked: every field in the form a reader
@@ -54,6 +59,7 @@ type Parsed struct {
 	Carrier  *ec.PublicKey
 	HeadC    [32]byte
 	SaltB    [32]byte
+	Content  [32]byte
 }
 
 // Parse checks a store key's shape: the version, both keys as points in
@@ -91,6 +97,14 @@ func Parse(raw []byte) (*Parsed, error) {
 		return nil, errors.New("store key: salt is not 32 bytes of hex")
 	}
 	copy(p.SaltB[:], s)
+	ck, err := hex.DecodeString(k.ContentKey)
+	if err != nil || len(ck) != 32 {
+		return nil, errors.New("store key: contentKey is not 32 bytes of hex")
+	}
+	copy(p.Content[:], ck)
+	if err := keyed.CheckScalar(p.Content); err != nil {
+		return nil, fmt.Errorf("store key: contentKey: %w", err)
+	}
 	return p, nil
 }
 

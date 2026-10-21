@@ -31,6 +31,10 @@ type StoreResult struct {
 	// Carrier and Record are set on a pass.
 	Carrier *carrier.Carrier
 	Record  *record.Record
+	// Body and Originator are a sealed carrier's content once opened, and
+	// the identity that signed it when its originator is inside.
+	Body       record.Map
+	Originator *ec.PublicKey
 }
 
 func (r *StoreResult) refuse(c Code, reason string) *StoreResult {

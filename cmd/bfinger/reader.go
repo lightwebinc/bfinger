@@ -164,8 +164,12 @@ type storeResult struct {
 	Manifest string         `json:"manifestTxid,omitempty"`
 	Members  []string       `json:"memberTxids,omitempty"`
 	Body     map[string]any `json:"body,omitempty"`
-	// Private is set for a store committed to by a salted root.
-	Private bool `json:"private,omitempty"`
+	// Private is set for a store committed to by a salted root. Carrierkey
+	// is its seal's carrier setting, and Originator the identity that
+	// signed its content when the originator is inside.
+	Private    bool   `json:"private,omitempty"`
+	Carrierkey string `json:"carrierKey,omitempty"`
+	Originator string `json:"originator,omitempty"`
 }
 
 // readStores fetches and verifies every store the verified record links, at
@@ -220,7 +224,7 @@ func readStores(ctx context.Context, g *global, hs *hostset.Client, base string,
 		sr := storeResult{Name: ref.Name, Count: ref.Count}
 		leaf, err := record.RefLeaf(ref)
 		if err == nil && leaf == record.LeafSalted {
-			out = append(out, readPrivate(ctx, g, ref, keyBytes, fetch, &spent, opt))
+			out = append(out, readPrivate(ctx, g, ref, identity, keyBytes, fetch, &spent, opt))
 			continue
 		}
 		head, err := verify.Head(ref)
@@ -270,18 +274,29 @@ func readStores(ctx context.Context, g *global, hs *hostset.Client, base string,
 			continue
 		}
 		man, res := verify.ManifestOf(ctx, items, identity, ref, opt)
-		readMembers(ctx, &sr, ref.Name, man, res, func(c [32]byte) ([]verify.Item, []string, error) { return fetch(keyBytes, c) }, identity, spent, opt)
+		readMembers(&sr, ref.Name, man, res, func(c [32]byte) ([]verify.Item, []string, error) { return fetch(keyBytes, c) },
+			func(items []verify.Item, i int, mem record.Member) (*verify.StoreResult, record.Map) {
+				r := verify.MemberOf(ctx, items, identity, ref.Name, i, mem, opt)
+				if r.Record == nil {
+					return r, nil
+				}
+				return r, r.Record.Body
+			}, spent)
 		out = append(out, sr)
 	}
 	return out
 }
 
+// memberCheck verifies member index (from 1) of a store and returns its
+// result and its clear body.
+type memberCheck func(items []verify.Item, index int, mem record.Member) (*verify.StoreResult, record.Map)
+
 // readMembers finishes reading a store of more than one member whose
 // manifest has just been checked: each member is fetched and verified as a
 // carrier in its own right, under the key the store's carriers are indexed
 // by, and the members' content is joined in manifest order.
-func readMembers(ctx context.Context, sr *storeResult, name string, man *record.Manifest, res *verify.StoreResult,
-	fetch func(c [32]byte) ([]verify.Item, []string, error), under *ec.PublicKey, spent int, opt verify.Options) {
+func readMembers(sr *storeResult, name string, man *record.Manifest, res *verify.StoreResult,
+	fetch func(c [32]byte) ([]verify.Item, []string, error), member memberCheck, spent int) {
 	sr.Code, sr.Reason = res.Code, res.Reason
 	if res.Carrier != nil {
 		sr.Manifest = res.Carrier.Tx.TxID().String()
@@ -313,12 +328,12 @@ func readMembers(ctx context.Context, sr *storeResult, name string, man *record.
 			sr.Code, sr.Reason = codeFor(err), fmt.Sprintf("member %d: %s", i+1, reasonFor(err, magreeing))
 			break
 		}
-		mres := verify.MemberOf(ctx, mitems, under, name, i+1, mem, opt)
+		mres, body := member(mitems, i+1, mem)
 		if !mres.Code.OK() {
 			sr.Code, sr.Reason = mres.Code, mres.Reason
 			break
 		}
-		v, ok := mres.Record.Body.Get(name)
+		v, ok := body.Get(name)
 		text, isText := v.(string)
 		if !ok || !isText {
 			sr.Code = verify.RefusedDecode
@@ -342,7 +357,7 @@ func readMembers(ctx context.Context, sr *storeResult, name string, man *record.
 // key can: the record commits to it by a salted root and names no head.
 // Without a key it is reported committed to and not linked, which is
 // exactly what it is to everyone else.
-func readPrivate(ctx context.Context, g *global, ref record.Ref, keyBytes []byte,
+func readPrivate(ctx context.Context, g *global, ref record.Ref, identity *ec.PublicKey, keyBytes []byte,
 	fetch func(under []byte, c [32]byte) ([]verify.Item, []string, error), spent *int, opt verify.Options) storeResult {
 	sr := storeResult{Name: ref.Name, Count: ref.Count, Private: true}
 	k := g.openKeys[ref.Name]
@@ -362,25 +377,37 @@ func readPrivate(ctx context.Context, g *global, ref record.Ref, keyBytes []byte
 		return sr
 	}
 	under := k.Carrier.Compressed()
-	pk := verify.PrivateKey{Head: k.HeadC, Salt: k.SaltB, CarrierKey: k.Carrier}
+	pk := verify.PrivateKey{Head: k.HeadC, Salt: k.SaltB, CarrierKey: k.Carrier, ContentKey: k.Content}
 	items, agreeing, err := fetch(under, k.HeadC)
 	if err != nil {
 		sr.Code, sr.Reason = codeFor(err), reasonFor(err, agreeing)
 		return sr
 	}
+	var res *verify.StoreResult
 	if ref.Count == 1 {
-		res := verify.PrivateSubRecord(ctx, items, ref, pk, opt)
+		res = verify.PrivateSubRecord(ctx, items, identity, ref, pk, opt)
 		sr.Code, sr.Reason = res.Code, res.Reason
 		if res.Carrier != nil {
 			sr.Carrier = res.Carrier.Tx.TxID().String()
 		}
-		if res.Code.OK() && res.Record != nil {
-			sr.Body = bodyMap(res.Record.Body)
+		if res.Code.OK() {
+			sr.Body = bodyMap(res.Body)
 		}
-		return sr
+	} else {
+		var man *record.Manifest
+		man, res = verify.PrivateManifestOf(ctx, items, identity, ref, pk, opt)
+		readMembers(&sr, ref.Name, man, res, func(c [32]byte) ([]verify.Item, []string, error) { return fetch(under, c) },
+			func(items []verify.Item, i int, mem record.Member) (*verify.StoreResult, record.Map) {
+				r := verify.PrivateMemberOf(ctx, items, identity, ref.Name, i, mem, pk, opt)
+				return r, r.Body
+			}, *spent)
 	}
-	man, res := verify.PrivateManifestOf(ctx, items, ref, pk, opt)
-	readMembers(ctx, &sr, ref.Name, man, res, func(c [32]byte) ([]verify.Item, []string, error) { return fetch(under, c) }, k.Carrier, *spent, opt)
+	if res.Code.OK() && res.Carrier != nil && res.Carrier.Record.Seal != nil {
+		sr.Carrierkey = res.Carrier.Record.Seal.Carrier
+		if res.Originator != nil {
+			sr.Originator = hex.EncodeToString(res.Originator.Compressed())
+		}
+	}
 	return sr
 }
 

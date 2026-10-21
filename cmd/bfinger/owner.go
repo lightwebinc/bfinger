@@ -323,14 +323,17 @@ type transitionFlags struct {
 	unset   []string
 	store   map[string]string
 	unstore []string
-	// private is the stores published private: salted, unlinked.
-	private   map[string]string
-	expires   time.Duration
-	yes       bool
-	dryRun    bool
-	count     int
-	sats      uint64
-	successor string
+	// private is the stores published private: salted, unlinked, sealed;
+	// carrierKey and originator are their attribution settings.
+	private    map[string]string
+	carrierKey string
+	originator string
+	expires    time.Duration
+	yes        bool
+	dryRun     bool
+	count      int
+	sats       uint64
+	successor  string
 }
 
 func parseTransition(name string, args []string, stderr *os.File) (*transitionFlags, []string, error) {
@@ -389,6 +392,20 @@ func parseTransition(name string, args []string, stderr *os.File) (*transitionFl
 			tf.private = map[string]string{}
 		}
 		tf.private[k] = val
+		return nil
+	})
+	fs.Func("carrier-key", "with -private: child (default; a key of the store's own, which the host cannot tie to you) or identity (your own)", func(v string) error {
+		if v != record.CarrierChild && v != record.CarrierIdentity {
+			return errors.New("want child or identity")
+		}
+		tf.carrierKey = v
+		return nil
+	})
+	fs.Func("originator", "with -private: inside (default; your identity and signature inside the sealed content) or absent", func(v string) error {
+		if v != record.OriginatorInside && v != record.OriginatorAbsent {
+			return errors.New("want inside or absent")
+		}
+		tf.originator = v
 		return nil
 	})
 	fs.Func("unstore", "sub-store to drop from the record (repeatable)", func(v string) error {
@@ -494,6 +511,17 @@ func (s *session) loadWallets() error {
 	succ := filepath.Join(s.g.cfg.Home, successorDir, "identity.json")
 	if _, err := os.Stat(succ); err == nil {
 		w, err := bwallet.OpenIdentity(succ, s.pool)
+		if err != nil {
+			return err
+		}
+		w.Originator = s.g.cfg.Originator
+		s.wallets[keyHex(w)] = w.Signer()
+	}
+	// The keys private stores' carriers are published under: the kill
+	// switch sweeps their trees.
+	carriers, _ := filepath.Glob(filepath.Join(s.g.cfg.Home, carrierKeyDir, "*.json"))
+	for _, p := range carriers {
+		w, err := bwallet.OpenIdentity(p, s.pool)
 		if err != nil {
 			return err
 		}
@@ -998,23 +1026,41 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 	// a carrier nobody can find.
 	plans := make(map[string][]string, len(names))
 	need := uint32(1) // the record's own carrier
+	privs := map[string]*privatePlan{}
 	for _, name := range names {
-		parts, err := chunkStore(name, content[name])
+		_, isPrivate := s.tf.private[name]
+		reserve := 0
+		if isPrivate {
+			reserve = sealReserve
+		}
+		parts, err := chunkStore(name, content[name], reserve)
 		if err != nil {
 			return err
 		}
 		plans[name] = parts
-		need += uint32(len(parts)) //nolint:gosec // bounded by MaxMembers
+		n := uint32(len(parts)) //nolint:gosec // bounded by MaxMembers
 		if len(parts) > 1 {
-			need++ // the manifest
+			n++ // the manifest
 			s.say("store %q: %d bytes in %d parts plus a manifest", name, len(content[name]), len(parts))
 		}
+		if isPrivate {
+			pp, err := s.planPrivate(name)
+			if err != nil {
+				return err
+			}
+			pp.need = n
+			privs[name] = pp
+			if pp.child {
+				continue // funded by a tree of its own, under its own key
+			}
+		}
+		need += n
 	}
 	// A private store's salt, drawn once per store: the root commits to it,
 	// and the store key hands it to whoever is meant to read the store.
-	salts := make(map[string][32]byte, len(s.tf.private))
-	for name := range s.tf.private {
-		salts[name] = randomBytes()
+	salts := make(map[string][32]byte, len(privs))
+	for name, pp := range privs {
+		salts[name] = pp.salt
 	}
 	tree, vout, err := s.fundingTree(ctx, need)
 	if err != nil {
@@ -1039,29 +1085,50 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 		rec  *record.Record
 		tx   *transaction.Transaction
 		vout uint32
+		tree *transaction.Transaction
 	}
 	var subs []minted
 	for _, name := range names {
 		parts := plans[name]
 		members := make([]record.Member, 0, len(parts))
 		leaves := make([][32]byte, 0, len(parts))
+		// Where this store's carriers come from: the transition's tree and
+		// signer, or for a private store under a key of its own, that key
+		// and a tree minted for it alone.
+		signer, stree, svout := s.signer, tree, vout
+		pp := privs[name]
+		if pp != nil {
+			signer = pp.signer
+			if pp.child {
+				if stree, svout, err = s.childTree(ctx, pp); err != nil {
+					return err
+				}
+			}
+		}
 		for i, text := range parts {
-			sr, err := s.storeRecord(record.KindSub, name, record.Map{{Key: name, Val: text}})
+			clear := record.Map{{Key: name, Val: text}}
+			sr, err := s.storeRecordUnder(signer, record.KindSub, name, clear)
+			if pp != nil {
+				err = pp.seal(ctx, s, sr, uint64(i), len(parts) == 1)
+			}
 			if err != nil {
 				return err
 			}
-			sk, err := carrier.Mint(ctx, s.signer, s.g.cfg.Originator, sr, tree, vout)
+			sk, err := carrier.Mint(ctx, signer, s.g.cfg.Originator, sr, stree, svout)
 			if err != nil {
 				return fmt.Errorf("store %q part %d carrier: %w", name, i+1, err)
 			}
 			c := carrier.Commitment(sk)
 			members = append(members, record.Member{C: c, Name: partName(len(parts), i), Size: uint64(len(text)), Type: storeType})
 			leaves = append(leaves, c)
-			subs = append(subs, minted{name, sr, sk, vout})
-			s.say("store %q: carrier %s (%d bytes), funding output %d", name, sk.TxID(), sk.Size(), vout)
-			vout++
+			subs = append(subs, minted{name, sr, sk, svout, stree})
+			s.say("store %q: carrier %s (%d bytes), funding output %d", name, sk.TxID(), sk.Size(), svout)
+			svout++
 		}
 		salt, private := salts[name]
+		if pp == nil || !pp.child {
+			vout = svout
+		}
 		if len(parts) == 1 {
 			// One member: the store's root IS the leaf hash of it, so a
 			// reader proves membership with one hash and no manifest is
@@ -1078,11 +1145,14 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 		if err != nil {
 			return fmt.Errorf("store %q manifest: %w", name, err)
 		}
-		mr, err := s.storeRecord(record.KindManifest, name, body)
+		mr, err := s.storeRecordUnder(signer, record.KindManifest, name, body)
+		if pp != nil && err == nil {
+			err = pp.seal(ctx, s, mr, uint64(len(parts)), true)
+		}
 		if err != nil {
 			return err
 		}
-		mk, err := carrier.Mint(ctx, s.signer, s.g.cfg.Originator, mr, tree, vout)
+		mk, err := carrier.Mint(ctx, signer, s.g.cfg.Originator, mr, stree, svout)
 		if err != nil {
 			return fmt.Errorf("store %q manifest carrier: %w", name, err)
 		}
@@ -1095,9 +1165,12 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 		} else {
 			rec.Refs = append(rec.Refs, storeRef(name, leaves, &mc))
 		}
-		subs = append(subs, minted{name, mr, mk, vout})
-		s.say("store %q: manifest carrier %s (%d bytes) over %d member(s), funding output %d", name, mk.TxID(), mk.Size(), len(members), vout)
-		vout++
+		subs = append(subs, minted{name, mr, mk, svout, stree})
+		s.say("store %q: manifest carrier %s (%d bytes) over %d member(s), funding output %d", name, mk.TxID(), mk.Size(), len(members), svout)
+		svout++
+		if pp == nil || !pp.child {
+			vout = svout
+		}
 	}
 	slices.SortFunc(rec.Refs, func(a, b record.Ref) int { return strings.Compare(a.Name, b.Name) })
 
@@ -1226,13 +1299,13 @@ func (s *session) publish(ctx context.Context, rec *record.Record, witness [32]b
 			}
 			carriers = append(carriers, owner.StoreCarrier{
 				CHex: hex.EncodeToString(carrierC(m.tx)), Txid: m.tx.TxID().String(),
-				RawHex: m.tx.Hex(), FundingTxid: tree.TxID().String(), Kind: m.rec.Kind,
+				RawHex: m.tx.Hex(), FundingTxid: m.tree.TxID().String(), Kind: m.rec.Kind,
 			})
 		}
 		if len(carriers) > 0 {
 			st := owner.Store{Name: ref.Name, Head: carriers[len(carriers)-1].CHex, Count: ref.Count, Carriers: carriers}
-			if salt, private := salts[ref.Name]; private {
-				st.Leaf, st.SaltHex = record.LeafSalted, hex.EncodeToString(salt[:])
+			if pp := privs[ref.Name]; pp != nil {
+				pp.fill(&st)
 			}
 			stores = append(stores, st)
 			continue
@@ -1472,6 +1545,12 @@ func (s *session) carriedRefs(tf *transitionFlags) []record.Ref {
 // store. A part of a chunked store is the same shape; the manifest is what
 // says it is a part.
 func (s *session) storeRecord(kind uint8, name string, body record.Map) (*record.Record, error) {
+	return s.storeRecordUnder(s.signer, kind, name, body)
+}
+
+// storeRecordUnder is storeRecord under signer's identity: the identity's
+// own, or a private store's key of its own.
+func (s *session) storeRecordUnder(signer *bwallet.Signer, kind uint8, name string, body record.Map) (*record.Record, error) {
 	if enc, err := record.Encode(body); err != nil {
 		return nil, err
 	} else if len(enc) > record.BodyBound(kind) {
@@ -1481,7 +1560,7 @@ func (s *session) storeRecord(kind uint8, name string, body record.Map) (*record
 	rec := &record.Record{Magic: record.MagicV1, Seq: 1, Kind: kind,
 		Salt: randomBytes(), WC: sha256.Sum256(w[:]),
 		NotBefore: uint64(time.Now().Unix()), Body: body} //nolint:gosec // unix seconds
-	copy(rec.IdentityKey[:], s.signer.IdentityKey().Compressed())
+	copy(rec.IdentityKey[:], signer.IdentityKey().Compressed())
 	return rec, nil
 }
 
@@ -1493,7 +1572,7 @@ func (s *session) storeRecord(kind uint8, name string, body record.Map) (*record
 // value, so the overhead is taken from an actual encoding and a few bytes
 // are left for that header. Each part is then encoded and checked, because
 // a budget that was subtly wrong should fail here and not at a host.
-func chunkStore(name, text string) ([]string, error) {
+func chunkStore(name, text string, reserve int) ([]string, error) {
 	if name == "" || len(name) > record.MaxRefName {
 		return nil, usage("a store name is 1 to 64 bytes")
 	}
@@ -1504,7 +1583,7 @@ func chunkStore(name, text string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	budget := record.MaxSubBodyBytes - len(empty) - 8
+	budget := record.MaxSubBodyBytes - len(empty) - 8 - reserve
 	if budget < 1 {
 		return nil, fmt.Errorf("store %q: the name leaves no room for content", name)
 	}
@@ -1537,8 +1616,12 @@ func chunkStore(name, text string) ([]string, error) {
 		for i := range parts {
 			mems[i] = record.Member{Name: partName(len(parts), i), Size: uint64(len(parts[i])), Type: storeType}
 		}
-		if _, err := (&record.Manifest{Members: mems}).Body(); err != nil {
+		mb, err := (&record.Manifest{Members: mems}).Body()
+		if err != nil {
 			return nil, fmt.Errorf("store %q needs %d parts: %w", name, len(parts), err)
+		}
+		if enc, err := record.Encode(mb); err != nil || len(enc) > record.MaxSubBodyBytes-reserve {
+			return nil, fmt.Errorf("store %q needs %d parts, and their manifest does not fit once sealed", name, len(parts))
 		}
 	}
 	for i, p := range parts {
@@ -1546,7 +1629,7 @@ func chunkStore(name, text string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		if len(enc) > record.MaxSubBodyBytes {
+		if len(enc) > record.MaxSubBodyBytes-reserve {
 			return nil, fmt.Errorf("store %q part %d is %d bytes encoded; the bound is %d", name, i+1, len(enc), record.MaxSubBodyBytes)
 		}
 	}
