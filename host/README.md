@@ -7,6 +7,8 @@ host from the `finger-host` image with its database and TLS front, see
 [docs/self-host.md](../docs/self-host.md); this file is for loading the module
 into a host you run yourself.
 
+> **Maintenance.** This module (`src`) is in maintenance: bug fixes only. A Go implementation is planned.
+
 ## Three object kinds
 
 | kind | shape | admitted when |
