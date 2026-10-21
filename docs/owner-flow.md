@@ -209,4 +209,7 @@ with `wallet = wire`.
   spent; trees the state does not list are added to it, and the kill sweeps
   them all. Nothing the host says is trusted: a tree this home holds no key
   for is named and skipped, and a sweep of anything else fails at settlement.
-  A tree minted and never spent by any carrier is not found.
+  A tree minted and never spent by any carrier is not found, and neither is
+  the tree of a private store under a key of its own: nothing a host holds
+  ties it to the identity, which is the point. Those are swept from the state
+  alone, so they are one more reason to keep the backup current.

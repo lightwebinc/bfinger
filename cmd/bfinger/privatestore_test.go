@@ -129,6 +129,13 @@ func TestPrivateStoreOpensOnlyWithItsKey(t *testing.T) {
 		t.Fatalf("wrong content key: %+v", st)
 	}
 
+	// publish -resume re-sends every carrier, the private stores' too,
+	// rebuilt from trees of their own.
+	e.must("publish", "-resume")
+	if !strings.Contains(e.stdout, "store note") || !strings.Contains(e.stdout, "store doc manifest") {
+		t.Fatalf("resume:\n%s", e.stdout)
+	}
+
 	// The kill switch reaches the stores' own trees too.
 	st, _ := owner.Load(e.home)
 	e.must("kill", "-confirm", "KILL", "-yes")

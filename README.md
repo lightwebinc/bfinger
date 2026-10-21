@@ -110,8 +110,9 @@ worked example in the pattern paper
 Built and working end to end: the reader (lookups, `verify`, `-watch`,
 `-json`, key pinning), the publisher (`init`, `fund`, `create`, `status`,
 `rotate`, `retire`, `kill`, `pay`, `receive`, `publish -resume`, `doctor`,
-`domain-docs`, `serve-wallet`), sub-stores, private stores (a salted root,
-sealed content, opened with a store key), and the two overlay host modules
+`domain-docs`, `serve-wallet`, `grant`, `deliver`, `open`, `inbox`),
+sub-stores, private stores (a salted root, sealed content, granted to one
+reader at a time and anchored on chain), and the two overlay host modules
 with a container image and a one-file host stack.
 
 Designed, not built yet: handle-certificate verification (BRC-52, built in
