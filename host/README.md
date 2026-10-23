@@ -7,7 +7,7 @@ host from the `finger-host` image with its database and TLS front, see
 [docs/self-host.md](../docs/self-host.md); this file is for loading the module
 into a host you run yourself.
 
-> **Maintenance.** This module (`src`) is in maintenance: bug fixes only. A Go implementation is planned.
+> **Maintenance.** This module (`src`) is in maintenance: bug fixes only. Its Go twin is `module/` ([The Go module](#the-go-module)).
 
 ## Three object kinds
 
@@ -150,6 +150,30 @@ than a healthy one. Alert on ratios, not on the presence of a series.
 Watch `finger_admitted_total{kind="token"}` against `finger_pending_tokens`:
 tokens arriving while pending climbs means carriers are not being delivered,
 which a reader sees as `RECORD-PENDING`.
+
+## The Go module
+
+The same module exists in Go, `module/` in this repository, written to
+bcommon's engine-neutral contract (`github.com/lightwebinc/bcommon/module`)
+for a Go overlay host that carries the adapter: `tm_finger` and `ls_finger`
+with the admissions, refusals, joins, kills, answers and metrics above, built
+from the Go core (the record codec and its rules, the tags and derivations,
+bcommon's canonical encodings). It takes no configuration; a host that mounts
+it must carry `tm_finger`. A host hands the topic manager the submission's
+bytes as they arrived (`module.WithSubmission`). It differs from this module in
+two ways:
+
+- `ls_finger` indexes what `tm_finger` admitted and the spends of what
+  `tm_finger` holds. A host tells every lookup service of every topic's
+  admissions and spends; this module keeps what it hears of other topics too,
+  which grows with every object the host admits and changes no answer.
+- The Go record codec knows key 13 (`seal`, the sealed private stores), so a
+  carrier whose seal is malformed, or that seals a transition, is refused
+  `bad-record`; this module carries key 13 as an unknown key. A reader refuses
+  such a record either way.
+
+Its tests drive it with the golden and the cases of this module's suite, and
+through a stand-in for an engine's admission path and a restart.
 
 ## Build and test
 
