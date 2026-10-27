@@ -78,8 +78,8 @@ github.com/bsv-blockchain/go-bt/v2 v2.7.4 h1:n2cv7uMXpCHB0so+acLoqbBo4Nk/G2IRq+I
 github.com/bsv-blockchain/go-bt/v2 v2.7.4/go.mod h1:FpGySPAZ0c4dR4Cfal1LEWOCVN6daPQbGcqeQkXInqw=
 github.com/bsv-blockchain/go-chaincfg v1.7.0 h1:TRQk8l+iIQqy/ekIW7452K6RJaVAK+Svo56q7BXo+0k=
 github.com/bsv-blockchain/go-chaincfg v1.7.0/go.mod h1:zrvdOMUlrgnW6TdIyqPJrQF6okQ2CpGu+sbKGfFgt+k=
-github.com/bsv-blockchain/go-chaintracks v1.4.3 h1:JksM8AHg5YWT+CG52s3ropYicSUw0ataxPxVaiqysGQ=
-github.com/bsv-blockchain/go-chaintracks v1.4.3/go.mod h1:V7nJIJvycxluf/A9zLfW4s/Vl/8sQzOuha983I1Lo5s=
+github.com/bsv-blockchain/go-chaintracks v1.4.5 h1:qs2JG6RsqsVt3wk/9oulZpxPEhevTBYBXNx9HoesolM=
+github.com/bsv-blockchain/go-chaintracks v1.4.5/go.mod h1:V7nJIJvycxluf/A9zLfW4s/Vl/8sQzOuha983I1Lo5s=
 github.com/bsv-blockchain/go-lockfree-queue v1.2.0 h1:VSD75MVVU63idFvcBDiL0BHcYZ5RgGwXHpeFIt9EzHo=
 github.com/bsv-blockchain/go-lockfree-queue v1.2.0/go.mod h1:kqhncPNlNQZ1nP4m/ZF+Xa9+MOSRMLGnnIn9d/Wc/JY=
 github.com/bsv-blockchain/go-p2p-message-bus v0.2.0 h1:FcbX4Z3alAnnRf8qCGITEyP1+fkRmRy0ENQMsG8Wmck=
@@ -94,8 +94,8 @@ github.com/bsv-blockchain/go-teranode-p2p-client v0.3.2 h1:4WsQ7nzzWny1eNJRQAPUi
 github.com/bsv-blockchain/go-teranode-p2p-client v0.3.2/go.mod h1:RtrXYNOf16bVhTkFdcUa11LfSjxCDeVM7ClvA/w1RTU=
 github.com/bsv-blockchain/go-tx-map v1.5.0 h1:5wTbktWmQ+Kgus5Phh4s/Z3UmnLov4ih2QkM7pkMuz4=
 github.com/bsv-blockchain/go-tx-map v1.5.0/go.mod h1:ZDojRIjPPIq8OHff3zO1k9JEc9a6D5h7vBN4qfZkOhU=
-github.com/bsv-blockchain/go-wallet-toolbox v0.191.0 h1:Bbqr1dHtJIp3jv9Zl7s/MCUomsE9JTC8M6pNuZskcWQ=
-github.com/bsv-blockchain/go-wallet-toolbox v0.191.0/go.mod h1:kUOH0QaOx8HA90JWb3tSLsdQmk+MVIwKyOHWMxz1Zvg=
+github.com/bsv-blockchain/go-wallet-toolbox v0.191.1 h1:50Q5N4FqhSzfwIjPgkUmIDglAtjhlBuYUCyfF0aGA1g=
+github.com/bsv-blockchain/go-wallet-toolbox v0.191.1/go.mod h1:IwQ8VFqxROa5UvaE4JbeHFtnFycsv02OWZ8KQ7bu+Vw=
 github.com/bsv-blockchain/go-wire v1.4.0 h1:9v/sWTguwoSfkF2oxh5+Lod6Tq4Yg21Ty1Kes8t4KhY=
 github.com/bsv-blockchain/go-wire v1.4.0/go.mod h1:sPXt83PtPfe1npw9PhF7D8jQz5Vp18E0FB4gSWar/Xg=
 github.com/bsv-blockchain/teranode v0.16.1-beta-1 h1:RqG3AJyeKQnq5LG0FsvHwZmOjs2V+6VjiW0MvAaBmr0=
@@ -333,8 +333,8 @@ github.com/libp2p/go-cidranger v1.1.0 h1:ewPN8EZ0dd1LSnrtuwd4709PXVcITVeuwbag38y
 github.com/libp2p/go-cidranger v1.1.0/go.mod h1:KWZTfSr+r9qEo9OkI9/SIEeAtw+NNoU0dXIXt15Okic=
 github.com/libp2p/go-flow-metrics v0.3.0 h1:q31zcHUvHnwDO0SHaukewPYgwOBSxtt830uJtUx6784=
 github.com/libp2p/go-flow-metrics v0.3.0/go.mod h1:nuhlreIwEguM1IvHAew3ij7A8BMlyHQJ279ao24eZZo=
-github.com/libp2p/go-libp2p v0.50.0 h1:A0tBP6mr6GV7l5ip2Q04a/IxPqVYYaCiif5s8JuXkN4=
-github.com/libp2p/go-libp2p v0.50.0/go.mod h1:RjqB+dxCWNZ33yw0yeK5Pu157oNxKuaTZY6vLed4t8w=
+github.com/libp2p/go-libp2p v0.51.0 h1:wdoCh62SvoLW/k/YVbnlkhb4kOQvfoCbiU7s9J7+Fls=
+github.com/libp2p/go-libp2p v0.51.0/go.mod h1:w5gWWPh4RWddGAZd2zumIoigh3kl0/jiXhlfaE7mrgI=
 github.com/libp2p/go-libp2p-asn-util v0.4.1 h1:xqL7++IKD9TBFMgnLPZR6/6iYhawHKHl950SO9L6n94=
 github.com/libp2p/go-libp2p-asn-util v0.4.1/go.mod h1:d/NI6XZ9qxw67b4e+NgpQexCIiFYJjErASrYW4PFDN8=
 github.com/libp2p/go-libp2p-kad-dht v0.42.2 h1:5RtESYeBbjaF+KIPmU47xz2DOb2iLqvoRCZcsjxCS48=

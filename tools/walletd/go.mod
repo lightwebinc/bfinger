@@ -4,7 +4,7 @@ go 1.27.2
 
 require (
 	github.com/bsv-blockchain/go-sdk v1.7.2
-	github.com/bsv-blockchain/go-wallet-toolbox v0.191.0
+	github.com/bsv-blockchain/go-wallet-toolbox v0.191.1
 )
 
 require (
@@ -39,7 +39,7 @@ require (
 	github.com/bsv-blockchain/go-bsv-middleware v0.16.3 // indirect
 	github.com/bsv-blockchain/go-bt/v2 v2.7.4 // indirect
 	github.com/bsv-blockchain/go-chaincfg v1.7.0 // indirect
-	github.com/bsv-blockchain/go-chaintracks v1.4.3 // indirect
+	github.com/bsv-blockchain/go-chaintracks v1.4.5 // indirect
 	github.com/bsv-blockchain/go-lockfree-queue v1.2.0 // indirect
 	github.com/bsv-blockchain/go-p2p-message-bus v0.2.0 // indirect
 	github.com/bsv-blockchain/go-safe-conversion v1.2.0 // indirect
@@ -181,7 +181,7 @@ require (
 	github.com/prometheus/common v0.72.0 // indirect
 	github.com/prometheus/procfs v0.22.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
-	github.com/quic-go/quic-go v0.63.0 // indirect
+	github.com/quic-go/quic-go v0.64.1 // indirect
 	github.com/quic-go/webtransport-go v0.13.0 // indirect
 	github.com/redis/go-redis/v9 v9.23.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
@@ -278,7 +278,7 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
-replace github.com/libp2p/go-libp2p => github.com/libp2p/go-libp2p v0.50.0
+replace github.com/libp2p/go-libp2p => github.com/libp2p/go-libp2p v0.51.0
 
 replace github.com/quic-go/webtransport-go => github.com/quic-go/webtransport-go v0.13.0
 
