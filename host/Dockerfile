@@ -15,7 +15,7 @@ ARG BLUEPRINTS=ghcr.io/lightwebinc/overlay-blueprints:0.2.2
 # The bundle is JavaScript, the same bytes on every platform, so it is built
 # once on the build machine's own platform; the final stage only copies files
 # onto the host image, so an arm64 image needs no emulation.
-FROM --platform=$BUILDPLATFORM node:24@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a AS bundle
+FROM --platform=$BUILDPLATFORM node:24@sha256:e7add2a490bb17d97b485b8641bd88455fff7839ade0f5eba493c3508124d413 AS bundle
 WORKDIR /src/host
 COPY host/package.json host/package-lock.json ./
 COPY host/vendor ./vendor
