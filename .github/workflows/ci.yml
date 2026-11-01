@@ -43,7 +43,7 @@ jobs:
       - name: direct dependencies are go-sdk and bcommon, go-sdk at v1.7.1
         run: make deps-check
       # LICENSE-THIRD-PARTY is generated from what the binary actually links,
-      # so a new dependency that nobody notices is a licence obligation that
+      # so a new dependency that nobody notices is a license obligation that
       # nobody notices. This fails the build instead.
       - name: third-party licences are current
         run: python3 scripts/gen-third-party-licenses.py . --check

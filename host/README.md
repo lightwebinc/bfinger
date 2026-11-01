@@ -81,7 +81,7 @@ logs `ls_finger rebuilt its chains from the index`, and answers without a
 restart. Kills reach such a replica through the sweep, which sync carries
 (its tombstone is a topic output): the service reads the spends from every
 admitted transaction's inputs, and on restore from each row's BEEF, which
-the reference host passes from v0.2.1
+the reference host passes
 ([flows 16](../docs/flows.md#16-catching-up-from-a-peer)).
 
 ## Deploying
@@ -138,7 +138,7 @@ than a healthy one. Alert on ratios, not on the presence of a series.
 | Series | Kind | Watch for |
 | --- | --- | --- |
 | `finger_admitted_total{kind}` | counter | `token`, `carrier`, `funding` or `spend`. A publisher moves `token` and `carrier` together; `spend` is a sweep, so records are being retracted |
-| `finger_refused_total{reason}` | counter | `not-pushdrop`, `bad-tag`, `bad-sig`, `bad-record`, `bad-lock`, `mineable` or `other`. Rising `bad-sig` or `bad-lock` against steady admissions is somebody publishing objects that do not verify |
+| `finger_refused_total{reason}` | counter | `not-pushdrop`, `bad-tag`, `bad-sig`, `bad-record`, `bad-lock`, `mineable`, `non-canonical-unlocking` or `other`. Rising `bad-sig` or `bad-lock` against steady admissions is somebody publishing objects that do not verify |
 | `finger_join_failures_total{reason}` | counter | `bad-record`, `bad-lock`, `duplicate-create`, `no-current`, `retired`, `rotated`, `successor-taken`, `bad-prev`, `bad-witness`, `bad-seq`, `not-spent`, `killed`. An admitted object failed the chain rules; the previous state stays current |
 | `finger_killed_total{reason}` | counter | `funding-spent`. Any movement means an identity was retracted |
 | `finger_pending_tokens` | gauge | tokens whose carrier has not arrived. A small number that drains is the delivery window; one that does not drain is a carrier that never arrived |
@@ -179,9 +179,11 @@ through a stand-in for an engine's admission path and a restart.
 
 Node 24: `npm test` builds `dist/` with tsc and the bundle with esbuild, then
 runs the tests on `dist/`. `bundle.test.ts` mounts `bundle/index.js` as the
-host would and admits the golden token and carrier. `bundle-check.test.ts`
-tests the bundle step's refusals on metafiles no clean build produces, because
-a bundle with a second SDK inlined still passes the smoke test. The tests read
+host would and admits the golden token and carrier, checks that the banner
+names the inlined library version, and that no source map ships. The bundle
+step itself refuses a build whose inputs lie outside `host/src/` and the
+library, because a bundle with a second SDK inlined would still pass the
+smoke test. The tests read
 the Go golden at `../testdata/golden/finger-v1.json`, so both SDKs are checked
 against one set of bytes.
 

@@ -723,6 +723,40 @@ bfinger: this identity is retired
 bfinger: "bob@example.com" looks like an address, not a status. This home publishes as alice@example.com; to publish as that identity, run this with the -config that names its home. To set that text as the status anyway: -set status=bob@example.com
 ```
 
+### Private stores: `-private`, `-open`, `grant`, `deliver`, `open`, `inbox`
+
+```console
+$ bfinger status -private note=@note.txt -yes      # sealed, committed to by a salted root
+store "note": carrier 9999999999999999999999999999999999999999999999999999999999999999 (611 bytes), funding output 2
+       ... the record's lines
+$ bfinger grant note bob@example.org -yes          # one reader; the anchor is a mined transaction
+delivery for bob@example.org written to /home/alice/.bfinger/deliveries/note-02ab12ab12ab12ab-9f3c1d20.bfd, anchored by 5555555555555555555555555555555555555555555555555555555555555555 (height 912460); the reader opens it with bfinger open
+$ bfinger grant note bob@example.org -release-only # a host delivers instead; spends nothing
+release of "note" for bob@example.org written to /home/alice/.bfinger/releases/note-02ab12ab12ab12ab.bfr; a host delivers it with bfinger deliver
+```
+
+The store key lands in `~/.bfinger/private/note.json`; `-carrier-key` and
+`-originator` set what the sealed carriers reveal
+([user guide](user-guide.md#8-publishing-your-own)). On the reader's side,
+the delivery file or the store key itself opens the store:
+
+```console
+$ bfinger open note-02ab12ab12ab12ab-9f3c1d20.bfd  # checks both signatures and the anchor
+delivered by 032465…ab1c at 2026-09-24T14:20:11Z; granted by 032465…ab1c
+alice@example.com
+  VERIFIED   ...
+       ... the record's lines, the store "note" among them
+$ bfinger alice@example.com -open note.json        # with the store key handed over directly
+```
+
+`-messagebox https://messagebox.example.com` on `grant` or `deliver` also
+sends the delivery to the reader's BRC-33 box (`sent to bob@example.org's box
+at ...; the reader takes it with bfinger inbox`); `bfinger inbox -messagebox
+https://messagebox.example.com` writes each waiting delivery under
+`~/.bfinger/deliveries/` (`delivery from 032465…ab1c written to ...; open it
+with bfinger open`), or prints `no deliveries waiting`. A box that asks for
+payment is refused.
+
 ## 22. `rotate`, and the transition that completes it
 
 ```console
@@ -802,6 +836,21 @@ says "stopped"; `kill` retracts every sequence at once. Without `-yes` each
 sweep's hex is printed and nothing sent. Without `-confirm KILL`, exit `2`;
 with nothing to sweep, exit `1`: `no funding trees recorded; nothing to
 sweep`.
+
+A home that lost `state.json`, or was restored from a copy older than its
+latest tree, recovers the trees from a host first:
+
+```console
+$ bfinger kill -confirm KILL -recover alice@example.com -yes
+```
+
+It asks the lookup host (`host`, else the one the address's manifest names)
+for the identity's outputs under every key the home holds and reads each
+funding tree out of the carriers' BEEFs; trees the state lacks are added, then
+swept. Nothing the host says is trusted: a tree this home holds no key for is
+named and skipped. A tree never spent by a carrier, and the tree of a private
+store under a key of its own, cannot be found this way
+([owner-flow.md](owner-flow.md#recovery)).
 
 ## 25. `publish -resume`
 
@@ -925,6 +974,7 @@ Other lines, when they apply:
 | `arcade      <url> answering, proofs async` | an `arcade:` or `arc:` leg (the default), instead of `settle` |
 | `chain       NONE (no node on network regtest; set chain or asset)` | a regtest chain with no node configured |
 | `fees        <rate> sat/bytes, floor <n> (live policy: arc\|cache\|static, <error>)` | `fee_source = arc`: whether the broadcaster's policy answered, a cached answer is in use, or the static rate |
+| `backup      current: recorded <time> at seq <n>, holds this witness`, `backup      STALE: ...`, or the home path and sequence to copy | whether the copy recorded by `doctor -backed-up` still holds the current witness ([owner-flow.md](owner-flow.md#backing-up-the-home)) |
 | `<label>     <url>: <error>` | an endpoint did not answer (exit still `0`) |
 
 Each transition writes a `journal` entry before either leg is sent: `ok`,

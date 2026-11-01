@@ -6,10 +6,11 @@
 # The builder is pinned by digest and matches go.mod's Go version, so the
 # stdlib scanning sees is the one that ships.
 #
-# No ENV defaults are baked in. Three settings are addresses of somebody's
-# deployment and deliberately have no default anywhere, the header source
-# above all: a default there would send verification questions to a third
-# party. Pass them as flags or in a config file. See docs/owner-flow.md.
+# No ENV defaults are baked in. The host and the facade are addresses of
+# somebody's deployment and have no default anywhere; the header source
+# defaults to the public WhatsOnChain service on the network, and every
+# header it answers is checked for its proof of work. Pass settings as flags,
+# BFINGER_* variables or a config file. See docs/configuration.md.
 #
 # The command keeps state (a pinned-key store, and for a publisher a wallet
 # and a journal) under $BFINGER_HOME, ~/.bfinger by default,
@@ -55,8 +56,8 @@ USER nonroot:nonroot
 COPY --from=builder /out/ /usr/local/bin/
 COPY --from=builder --chown=65532:65532 --chmod=0700 /state/.bfinger /home/nonroot/.bfinger
 
-# The licences travel with the image. The binary above statically contains
-# go-sdk, whose licence requires its own text to be included in any copy or
+# The licenses travel with the image. The binary above statically contains
+# go-sdk, whose license requires its own text to be included in any copy or
 # substantial portion of the software, and static linking leaves that file
 # behind. Source-tree-only compliance does not cover a published image.
 COPY LICENSE NOTICE LICENSE-THIRD-PARTY /usr/share/doc/bfinger/

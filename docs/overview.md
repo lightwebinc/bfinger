@@ -108,7 +108,7 @@ Documented, not built as products:
   to a different question, never to the free base one
   ([architecture.md](architecture.md#host-side-charging-a-seam)).
 - **Sub-stores.** A record commits to further stores by Merkle root, fetched
-  only when wanted. The store machinery is built (`-store`); named stores such
+  only when wanted. The store machinery is built (`-store`, `-private`); named stores such
   as grants, links and media, and delegated writing, are not.
 - **Content only a payer can read.** A lookup price sells availability, never
   exclusivity, because every host holds a copy. A real restriction needs

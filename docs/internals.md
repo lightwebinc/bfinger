@@ -70,8 +70,9 @@ internal/
   protocol/         bfinger's formats: record, token, carrier, mint
   reader/           lookup questions, the reader's algorithm, the pin file
   publisher/        the publisher's state and its wallet profile
+module/             tm_finger and ls_finger in Go, to bcommon's module contract, for a Go overlay host
 host/               tm_finger and ls_finger in TypeScript, and the finger-host image
-deploy/             the self-host compose file
+deploy/             the self-host compose file, and the AWS CloudFormation stack
 docs/               the specification and these documents
 scripts/            third-party license generation
 testdata/golden/    the shared vector every implementation checks, and a Go-only mint vector

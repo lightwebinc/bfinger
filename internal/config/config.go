@@ -1,12 +1,13 @@
 // Package config resolves bfinger's settings: flags, then BFINGER_* in the
 // environment, then the config file, then the built-in default.
 //
-// The overlay addresses have NO default: the host, the facade and the header
-// source. The header source in particular is the egress control. A default
-// there would quietly send verification questions to somebody else's server,
-// so a missing value is a usage error. The chain view and the settlement leg
-// default, on mainnet and testnet, to the public services that need no node
-// (WhatsOnChain and GorillaPool's arcade); a node is an option for both.
+// The overlay addresses have NO default: the host (the domain's manifest
+// names it) and the facade. The header source, the chain view and the
+// settlement leg default, on mainnet and testnet, to the public services that
+// need no node (WhatsOnChain headers checked for their proof of work,
+// WhatsOnChain's chain view, GorillaPool's arcade); regtest has no default
+// header source, so a missing value there is a usage error. A node is an
+// option for all three.
 package config
 
 import (

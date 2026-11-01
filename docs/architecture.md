@@ -18,7 +18,7 @@ movement, and the standards in play. Why it is built this way is in
 | Settlement leg | Where mined transactions go: an arcade installation (`arcade:`, the public one by default), an ARC installation (`arc:`), a node's RPC (`rpc:`) or a bare EF ingress (`tcp:`) |
 | Chain view | Where transactions, proofs and spends are read: WhatsOnChain by default, or a node's asset API (`chain`); every proof checked against the header source |
 | Header source | Where proofs are checked: WhatsOnChain, a chaintracks service, or an overlay bridge ([below](#header-sources)) |
-| Overlay host | The reference overlay host with `tm_finger` (admission) and `ls_finger` (lookup); image `ghcr.io/lightwebinc/finger-host` |
+| Overlay host | Any host carrying `tm_finger` (admission) and `ls_finger` (lookup): the reference overlay host with the TypeScript module (image `ghcr.io/lightwebinc/finger-host`), or a Go host that mounts the Go module (`module/`) |
 | Facade | Where objects are submitted: `POST /submit` on a host, or on an overlay bridge in front of one |
 | Overlay bridge | Multicast shape only: the facade, the object feed into its host, and a header API |
 | Subject domain | Serves `manifest.json` and the handle resolve answer (`bfinger domain-docs` writes both) |
@@ -276,12 +276,12 @@ own.
 | Standard | What it provides | Where | Status |
 | --- | --- | --- | --- |
 | BRC-9, BRC-67 | Verification against block headers | `bcommon/verify/`, driven by `internal/reader/verify/`; the payment check in `receive` | Implemented |
-| BRC-22 | Topic manager admission | `host/src/tm_finger.ts` | Implemented |
-| BRC-24 | Lookup service and `/lookup` | `host/src/ls_finger.ts`, `bcommon/lookup/` (client), `internal/reader/lookup/` (questions) | Implemented |
+| BRC-22 | Topic manager admission | `host/src/tm_finger.ts`, `module/tm.go` | Implemented |
+| BRC-24 | Lookup service and `/lookup` | `host/src/ls_finger.ts`, `module/ls.go`, `bcommon/lookup/` (client), `internal/reader/lookup/` (questions) | Implemented |
 | BRC-26 | Content addressing for media | the `media` sub-store | SEAM |
 | BRC-29 | Payable destination from an identity key | `bcommon/bwallet/derived.go`, `pay`, `receive` | Implemented |
 | BRC-30 | Extended Format on the settlement leg | `bcommon/publish/settle.go` | Implemented |
-| BRC-33 | Messagebox for a payment notice | a local notice file stands in | SEAM |
+| BRC-33 | Message box | private store deliveries: `grant`, `deliver` and `inbox` with `-messagebox` (`internal/messagebox/`) | Implemented for deliveries; a payment notice is still a local file (SEAM) |
 | BRC-42, BRC-43 | Child keys, protocol and key ids | every derivation | Implemented |
 | BRC-48 | PushDrop | token, carrier and funding outputs | Implemented |
 | BRC-52 | Certificates over a handle resolve answer | `resolve.VerifyHandleCertificate` | SEAM |

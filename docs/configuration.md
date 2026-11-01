@@ -9,7 +9,7 @@ from the first of:
 4. the built-in default.
 
 An empty environment variable counts as unset, and a flag left at its zero
-value never hides a configured one. Eleven of the thirty-one keys have a global
+value never hides a configured one. Eleven of the thirty-two keys have a global
 flag; the rest are set only in the file or the environment, which keeps
 credentials such as `rpc_pass`, `arcade_key` and `woc_key` off command lines.
 
