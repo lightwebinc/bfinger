@@ -282,6 +282,6 @@ replace github.com/libp2p/go-libp2p => github.com/libp2p/go-libp2p v0.51.0
 
 replace github.com/quic-go/webtransport-go => github.com/quic-go/webtransport-go v0.13.0
 
-replace github.com/quic-go/quic-go => github.com/quic-go/quic-go v0.64.1
+replace github.com/quic-go/quic-go => github.com/quic-go/quic-go v0.65.0
 
 replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20261014044854-ca3452a79603
