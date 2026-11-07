@@ -55,8 +55,8 @@ func TestValidateBodyTextNamesTheOffence(t *testing.T) {
 	}
 	bad := map[string]string{
 		"a\x07b":                   "control character",
-		"\x1b[2Jclear":             "not a color",
-		"\x1b]0;title\x07":         "not a color",
+		"\x1b[2Jclear":             "not a colour",
+		"\x1b]0;title\x07":         "not a colour",
 		"x‮y":                      "bidirectional",
 		"bad\xffutf":               "UTF-8",
 		strings.Repeat("l\n", 201): "more than 200 lines",
