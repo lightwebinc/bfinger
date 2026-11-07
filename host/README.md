@@ -7,7 +7,7 @@ host from the `finger-host` image with its database and TLS front, see
 [docs/self-host.md](../docs/self-host.md); this file is for loading the module
 into a host you run yourself.
 
-> **Maintenance.** This module (`src`) is in maintenance: bug fixes only. Its Go twin is `module/` ([The Go module](#the-go-module)).
+> This module (`src`) is frozen: bug fixes only. New behavior goes to its Go twin, `module/` ([The Go module](#the-go-module)).
 
 ## Three object kinds
 

@@ -1,6 +1,7 @@
 # bfinger
 
 [![CI](https://github.com/lightwebinc/bfinger/actions/workflows/ci.yml/badge.svg)](https://github.com/lightwebinc/bfinger/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/lightwebinc/bfinger/actions/workflows/codeql.yml/badge.svg)](https://github.com/lightwebinc/bfinger/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/github/v/release/lightwebinc/bfinger)](https://github.com/lightwebinc/bfinger/releases)
 [![Go version](https://img.shields.io/github/go-mod/go-version/lightwebinc/bfinger)](go.mod)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -34,6 +35,8 @@ rest (WhatsOnChain, a public broadcaster), and every one is a setting you can
 point at your own node instead.
 
 **New here? Start with [QUICKSTART.md](QUICKSTART.md).**
+
+> The TypeScript host module under `host/` is frozen: bug fixes only. New behavior goes to its Go twin under `module/`, written to bcommon's `module` contract and mounted by a Go overlay engine ([host/README.md](host/README.md#the-go-module)). The `finger-host` image runs the TypeScript module.
 
 ## How it works
 
@@ -139,6 +142,10 @@ Two direct Go dependencies, both pinned exactly and asserted by `make
 verify`: [go-sdk](https://github.com/bsv-blockchain/go-sdk) and
 [bcommon](https://github.com/lightwebinc/bcommon), the public library that
 holds bfinger's generic half.
+
+## Security
+
+Report a vulnerability privately: [SECURITY.md](SECURITY.md).
 
 ## License
 
