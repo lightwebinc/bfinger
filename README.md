@@ -113,7 +113,8 @@ Built and working end to end: the reader (lookups, `verify`, `-watch`,
 `domain-docs`, `serve-wallet`, `grant`, `deliver`, `open`, `inbox`),
 sub-stores, private stores (a salted root, sealed content, granted to one
 reader at a time and anchored on chain), and the two overlay host modules
-with a container image and a one-file host stack.
+(TypeScript, with their Go twin under `module/`) with a container image and
+a one-file host stack.
 
 Designed, not built yet: handle-certificate verification (BRC-52, built in
 borg, a sibling application; not yet adopted here), a messagebox for payment

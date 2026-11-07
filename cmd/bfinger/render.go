@@ -24,7 +24,7 @@ const (
 )
 
 // renderOpts is how a value is allowed to reach the terminal. ansi keeps
-// colour and weight (SGR) sequences, and nothing else, and only when the
+// color and weight (SGR) sequences, and nothing else, and only when the
 // caller has checked the terminal wants them; ascii degrades every rune above
 // 0x7E to "?" for a terminal that cannot draw it.
 type renderOpts struct {
@@ -83,7 +83,7 @@ func planText(err error) error {
 // safeLabel filters a string that came out of a record before it reaches a
 // terminal, with no escape sequence allowed at all. Store names, body field
 // names and refusal reasons are publisher-supplied and none of them is ever
-// allowed colour, so they go through this rather than through sanitize.
+// allowed color, so they go through this rather than through sanitize.
 // The VALUES were always filtered; the names and reasons reaching a terminal
 // raw was the hole, and it is the same terminal-injection hole the value
 // filter exists to close.

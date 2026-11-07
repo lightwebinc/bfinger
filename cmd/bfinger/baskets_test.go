@@ -232,7 +232,7 @@ func TestWalletActionBasketsAreFrozen(t *testing.T) {
 	checkLabels(t, "kill sweep", w.creates[0].Labels, []string{"bfinger", "kill"})
 
 	// A BRC-29 payment leaves the owner's wallet, so its output is in no
-	// basket and has no tags or instructions; only the action is labelled.
+	// basket and has no tags or instructions; only the action is labeled.
 	w.creates = nil
 	dest, err := script.NewFromHex("76a914" + strings.Repeat("00", 20) + "88ac")
 	if err != nil {
@@ -293,7 +293,7 @@ func TestWalletActionBasketsAreFrozen(t *testing.T) {
 		t.Errorf("funding check: the refusal does not name the pinned basket: %v", err)
 	}
 
-	// The constants themselves, by literal, as an addition to the behaviour
+	// The constants themselves, by literal, as an addition to the behavior
 	// above: they are what the helpers are expected to keep passing.
 	for _, c := range []struct{ name, got, want string }{
 		{"basketFunding", basketFunding, "bfinger record funding"},

@@ -65,7 +65,7 @@ func TestWireSignerCarriesTheWalletProfile(t *testing.T) {
 	}
 }
 
-// change recognises a home's change by each wallet's fund script. A wallet
+// change recognizes a home's change by each wallet's fund script. A wallet
 // with no profile has none, and its change left out of the pool reads as
 // spent coin, so change names that wallet on stderr. The wallets it can
 // derive for are still recorded, and a wallet whose derivation fails for any

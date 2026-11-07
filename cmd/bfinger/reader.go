@@ -87,7 +87,7 @@ func readerFlagSet(name string, defaultUnmined bool, stderr *os.File) (*flag.Fla
 
 // collectPositional parses a command line whose flags may appear on either
 // side of the positional words (finger-style). The flag package stops at the
-// first word it does not recognise as a flag, so a single Parse would leave
+// first word it does not recognize as a flag, so a single Parse would leave
 // everything after the address unread; resuming the parse past each
 // positional is what makes the documented order work.
 // collectPositional parses flags that may appear on either side of the
@@ -955,8 +955,8 @@ func report(g *global, lr *lookupResult, rf *readerFlags, trace bool, stdout, st
 	}
 }
 
-// render decides how body text reaches w. -ansi is honoured as given: the
-// NO_COLOR convention and TERM govern whether a program adds colour of its
+// render decides how body text reaches w. -ansi is honored as given: the
+// NO_COLOR convention and TERM govern whether a program adds color of its
 // own accord, and bfinger never does, so neither may veto a flag the reader
 // typed. Silently dropping it is worse than garbage on a terminal that
 // cannot draw it: the reader asked a question and got no answer either way.

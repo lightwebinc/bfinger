@@ -55,8 +55,8 @@ func TestValidateBodyTextNamesTheOffence(t *testing.T) {
 	}
 	bad := map[string]string{
 		"a\x07b":                   "control character",
-		"\x1b[2Jclear":             "not a colour",
-		"\x1b]0;title\x07":         "not a colour",
+		"\x1b[2Jclear":             "not a color",
+		"\x1b]0;title\x07":         "not a color",
 		"x‮y":                      "bidirectional",
 		"bad\xffutf":               "UTF-8",
 		strings.Repeat("l\n", 201): "more than 200 lines",
@@ -84,8 +84,8 @@ func TestValidateBodyTextNamesTheOffence(t *testing.T) {
 	}
 }
 
-// The reader asked for colour, so colour is what they get. NO_COLOR and TERM
-// govern whether a program adds colour of its own accord; bfinger never does,
+// The reader asked for color, so color is what they get. NO_COLOR and TERM
+// govern whether a program adds color of its own accord; bfinger never does,
 // so neither may veto the flag. Dropping it silently is how a reader is left
 // believing the feature does not work.
 func TestAnsiFlagIsHonouredWhateverTheEnvironmentSays(t *testing.T) {
@@ -99,7 +99,7 @@ func TestAnsiFlagIsHonouredWhateverTheEnvironmentSays(t *testing.T) {
 			t.Errorf("TERM=%q NO_COLOR=%q: -ansi was dropped", env.term, env.noColor)
 		}
 		if (&readerFlags{}).render(os.Stdout).ansi {
-			t.Errorf("TERM=%q: colour without the flag", env.term)
+			t.Errorf("TERM=%q: color without the flag", env.term)
 		}
 	}
 }

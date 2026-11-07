@@ -167,7 +167,7 @@ function checkBody(body: Value, kind: Kind): CborMap {
 
 /**
  * Encode in canonical CBOR, checking shape but not the transition rules (see
- * validateRecord), so a partially built record can still be serialised for a
+ * validateRecord), so a partially built record can still be serialized for a
  * test or a golden.
  */
 export function encodeRecord(r: CommittedRecord): Uint8Array {

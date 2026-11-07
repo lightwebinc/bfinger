@@ -99,7 +99,7 @@ deps-check:
 # The overlay host modules are a separate npm package with its own
 # toolchain, so they are not part of `verify`: a machine that can build the
 # command need not have Node on it. CI runs them in their own job, and this
-# target is how to run them here. It leaves the deployable artefact,
+# target is how to run them here. It leaves the deployable artifact,
 # host/bundle/index.js; the bundle step fails, and removes the file, if
 # anything but host/src/ and the bcommon package went into it.
 host:
@@ -141,7 +141,7 @@ clean:
 	rm -f bfinger
 
 # Generated from what the binary actually links, so a dependency arriving by
-# accident brings its licence obligation into the file rather than leaving it
+# accident brings its license obligation into the file rather than leaving it
 # undischarged.
 licences:
 	python3 scripts/gen-third-party-licenses.py . --check

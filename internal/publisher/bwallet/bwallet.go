@@ -32,7 +32,7 @@ const (
 
 // FundProtocol is the derivation protocol of bfinger's funding key, re-exported
 // for readers. Wallets derive under Profile.FundProtocol, which is this same
-// value copied when the package is initialised, so assigning to this variable
+// value copied when the package is initialized, so assigning to this variable
 // changes no wallet. The protocol name and security level are frozen with the
 // record and profile derivations (docs/committed-record.md section 11): the
 // invoice number is "1-bfinger-fund", and changing any part of it after the

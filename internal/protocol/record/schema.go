@@ -114,7 +114,7 @@ type Record struct {
 
 // Encode writes the record in canonical CBOR, checking shape but not the
 // transition rules (see Validate), so a partially built record can still be
-// serialised for a test or a golden.
+// serialized for a test or a golden.
 func (r *Record) Encode() ([]byte, error) {
 	m := Map{
 		{Key: keyMagic, Val: r.Magic[:]},
