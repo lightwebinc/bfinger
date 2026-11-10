@@ -284,4 +284,4 @@ replace github.com/quic-go/webtransport-go => github.com/quic-go/webtransport-go
 
 replace github.com/quic-go/quic-go => github.com/quic-go/quic-go v0.65.0
 
-replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20261014044854-ca3452a79603
+replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20261104182252-5bee61fc5225
