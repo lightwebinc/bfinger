@@ -99,11 +99,13 @@ func spendsMadeUp(tx *transaction.Transaction) {
 }
 
 // spendsProvenParent gives tx one input from a proven parent, for an
-// unproven transaction whose BEEF must carry its ancestry.
+// unproven transaction whose BEEF must carry its ancestry. The parent holds
+// enough for any payment a test builds on it: go-sdk checks the amounts of an
+// unmined transaction against its parents (from v1.7.2).
 func spendsProvenParent(tx *transaction.Transaction) {
 	parent := transaction.NewTransaction()
 	spendsMadeUp(parent)
-	parent.AddOutput(&transaction.TransactionOutput{Satoshis: 1, LockingScript: script.NewFromBytes([]byte{script.OpTRUE})})
+	parent.AddOutput(&transaction.TransactionOutput{Satoshis: 1_000_000, LockingScript: script.NewFromBytes([]byte{script.OpTRUE})})
 	isTxid := true
 	parent.MerklePath = transaction.NewMerklePath(1, [][]*transaction.PathElement{{{Offset: 0, Hash: parent.TxID(), Txid: &isTxid}}})
 	tx.AddInput(&transaction.TransactionInput{SourceTXID: parent.TxID(), SourceTransaction: parent, UnlockingScript: &script.Script{},

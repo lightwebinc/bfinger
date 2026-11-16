@@ -149,6 +149,7 @@ Report a vulnerability privately: [SECURITY.md](SECURITY.md).
 
 ## License
 
-Apache-2.0. One dependency is under the Open BSV License Version 5, whose
-grant is revocable and which limits use to the BSV blockchains; `NOTICE`
-explains, and `LICENSE-THIRD-PARTY` carries every license text.
+Apache-2.0. go-sdk is Apache-2.0 from v1.7.5, the version bfinger builds
+on. The host modules run beside the overlay host's own `@bsv/sdk`, which is
+under the Open BSV License Version 6; `NOTICE` explains, and
+`LICENSE-THIRD-PARTY` carries every license text.

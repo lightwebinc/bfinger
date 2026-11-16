@@ -4,10 +4,12 @@
 //
 // A carrier is kept off the chain by BRC-60's device turned the other way
 // round: a far-future nLockTime with a non-final input makes it unmineable in
-// practice, while SPV still verifies it through its funding parent. Nothing in
-// the SDK's verification path reads finality (verified at v1.7.1), so the host
-// admits it like any other object; the topic manager is what refuses one that
-// could reach the chain.
+// practice, while SPV still verifies it through its funding parent. That SPV
+// is the overlay plane's, bcommon's verify.Check, which has no finality rule:
+// from v1.7.2 go-sdk's spv.Verify refuses a transaction that is not final, as
+// a node refuses to mine it, so a reader that called it would refuse every
+// carrier. The host admits a carrier like any other object; the topic manager
+// is what refuses one that could reach the chain.
 //
 // The carrier, funding lock and sweep are the library's (package carrier of
 // github.com/lightwebinc/bcommon); this package is finger's use of them,

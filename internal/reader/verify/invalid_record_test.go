@@ -144,7 +144,7 @@ func TestInvalidRecordIsRefusedBeforeMineable(t *testing.T) {
 			r := f.rec(f.id1, 1, 1, [32]byte{}, nil, [32]byte{0xc6}, early)
 			cx := f.handCarrier(f.w1, f.recordLock(f.w1, r), 0, sh.lockTime, sh.seq)
 			checkVerify(t, f.run(f.tokenBeside(cx, f.bareItem(cx)), verify.Pin{}), "REFUSED-DECODE",
-				"carrier: missing source transaction: input 0",
+				"carrier: missing source transaction: input 0 of "+cx.TxID().String(),
 				"answer", "decode", "token-spv", "REFUSED-DECODE")
 		})
 	}
@@ -167,7 +167,7 @@ func TestVerifyCarrierAncestryMissingIsDecode(t *testing.T) {
 	cx := f.memberTx(f.w1, f.id1, 1, 0xc7, 1)
 	t.Run("funding parent not served", func(t *testing.T) {
 		checkVerify(t, f.run(f.tokenBeside(cx, f.bareItem(cx)), verify.Pin{}), "REFUSED-DECODE",
-			"carrier: missing source transaction: input 0",
+			"carrier: missing source transaction: input 0 of "+cx.TxID().String(),
 			"answer", "decode", "token-spv", "REFUSED-DECODE")
 	})
 	t.Run("control: funding parent served", func(t *testing.T) {
