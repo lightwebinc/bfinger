@@ -102,6 +102,13 @@ func Fill(b byte) [32]byte { return bcgoldentest.Fill(b) }
 // used for anything real: it is 32 bytes of 0x42.
 func FixedKey() *ec.PrivateKey { return bcgoldentest.FixedKey() }
 
+// Proven gives tx a one-transaction block at height and returns it (the
+// library's goldentest.Proven). From v1.7.2 go-sdk's SPV refuses an unmined
+// transaction with no inputs, so a hand-built parent is marked as mined.
+func Proven(tx *transaction.Transaction, height uint32) *transaction.Transaction {
+	return bcgoldentest.Proven(tx, height)
+}
+
 // Hex decodes or fails the test.
 func Hex(t *testing.T, s string) []byte {
 	t.Helper()

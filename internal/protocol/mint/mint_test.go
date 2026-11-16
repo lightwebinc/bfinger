@@ -9,6 +9,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 
+	bcverify "github.com/lightwebinc/bcommon/verify"
 	"github.com/lightwebinc/bfinger/internal/goldentest"
 	"github.com/lightwebinc/bfinger/internal/protocol/carrier"
 	"github.com/lightwebinc/bfinger/internal/protocol/mint"
@@ -97,8 +98,10 @@ func TestFundingTree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ok, err := spv.Verify(ctx, k, &goldentest.Tracker{Roots: map[uint32]string{101: root.String()}}, nil); err != nil || !ok {
-		t.Fatalf("carrier over tree spv ok=%v err=%v", ok, err)
+	// The carrier is not final by design, so it is checked as a reader
+	// checks a record (bcommon's verify.Check), not by go-sdk's spv.Verify.
+	if v, err := bcverify.Check(ctx, k, &goldentest.Tracker{Roots: map[uint32]string{101: root.String()}}); v != bcverify.Passed {
+		t.Fatalf("carrier over tree spv verdict=%v err=%v", v, err)
 	}
 
 	// Insufficient funds are refused, not silently under-paid.

@@ -103,7 +103,7 @@ func TestVerifySPVVerdicts(t *testing.T) {
 	t.Run("token/unmined, funding parent not served", func(t *testing.T) {
 		u := f.unminedToken(C1, f.w1)
 		checkVerify(t, f.run([]verify.Item{f.bareItem(u), f.item(c1, 0)}, verify.Pin{}), "REFUSED-DECODE",
-			"token does not verify: missing source transaction: input 0",
+			"token does not verify: missing source transaction: input 0 of "+u.TxID().String(),
 			"answer", "decode", "REFUSED-DECODE")
 		checkVerify(t, f.run([]verify.Item{f.item(u, 0), f.item(c1, 0)}, verify.Pin{}), "VERIFIED-UNMINED", "",
 			passed("VERIFIED-UNMINED")...)

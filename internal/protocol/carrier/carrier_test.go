@@ -11,6 +11,7 @@ import (
 	"github.com/bsv-blockchain/go-sdk/transaction"
 	"github.com/bsv-blockchain/go-sdk/wallet"
 
+	bcverify "github.com/lightwebinc/bcommon/verify"
 	"github.com/lightwebinc/bfinger/internal/goldentest"
 	"github.com/lightwebinc/bfinger/internal/protocol/carrier"
 	"github.com/lightwebinc/bfinger/internal/protocol/record"
@@ -51,7 +52,8 @@ func TestDecodeGoldenCarriers(t *testing.T) {
 	}
 }
 
-// SPV through the funding parent: the carrier is unmined, so verification
+// SPV through the funding parent, as a reader runs it (bcommon's
+// verify.Check, no finality rule): the carrier is unmined, so verification
 // runs its input script and checks outputs <= inputs, then proves the parent
 // against the stub tracker's root. The mutated carrier with a final input
 // still passes SPV, which is exactly why Validate exists.
@@ -61,16 +63,22 @@ func TestCarrierSPV(t *testing.T) {
 	for _, h := range []string{g.Carrier1TxHex, g.Carrier2TxHex, g.Mutations.Carrier1MineableTxHex} {
 		tx := goldentest.Tx(t, h)
 		tx.Inputs[0].SourceTransaction = funding
-		ok, err := spv.Verify(context.Background(), tx, g.StubTracker(), nil)
-		if err != nil || !ok {
-			t.Fatalf("spv: ok=%v err=%v", ok, err)
+		if k, err := bcverify.Check(context.Background(), tx, g.StubTracker()); k != bcverify.Passed {
+			t.Fatalf("spv: verdict=%v err=%v", k, err)
 		}
 	}
 	// And the negative control: a tracker that does not know the root.
 	tx := goldentest.Tx(t, g.Carrier1TxHex)
 	tx.Inputs[0].SourceTransaction = funding
-	if ok, _ := spv.Verify(context.Background(), tx, &goldentest.Tracker{}, nil); ok {
+	if k, _ := bcverify.Check(context.Background(), tx, &goldentest.Tracker{}); k == bcverify.Passed {
 		t.Fatal("verified against a tracker that knows no roots")
+	}
+	// go-sdk's spv.Verify is a node's SPV and refuses the carrier, which is
+	// not final by design: a reader must not call it on a record.
+	tx = goldentest.Tx(t, g.Carrier1TxHex)
+	tx.Inputs[0].SourceTransaction = funding
+	if ok, _ := spv.Verify(context.Background(), tx, g.StubTracker(), nil); ok {
+		t.Fatal("go-sdk spv.Verify admitted a non-final carrier")
 	}
 }
 

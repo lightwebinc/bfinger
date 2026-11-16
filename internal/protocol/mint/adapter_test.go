@@ -206,7 +206,7 @@ func TestTokenKeepsCallerUnlocker(t *testing.T) {
 	fee := func() mint.Input {
 		tx := transaction.NewTransaction()
 		tx.AddOutput(&transaction.TransactionOutput{Satoshis: 20000, LockingScript: change})
-		return mint.Input{Tx: tx, Vout: 0, Unlocker: token.RecordUnlocker(ctx, b, orig)}
+		return mint.Input{Tx: goldentest.Proven(tx, 800), Vout: 0, Unlocker: token.RecordUnlocker(ctx, b, orig)}
 	}
 	prev := func(u transaction.UnlockingScriptTemplate) *mint.Input {
 		return &mint.Input{Tx: t1, Vout: 0, Unlocker: u}
