@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.28.0@sha256:bb22d9815c728170f72750f4e5b0d672e06176142e1d602c7e66c050100b7e5b
+# syntax=docker/dockerfile:1.29.0@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 #
 # Multi-stage Dockerfile for bfinger. Produces a single static binary at
 # /usr/local/bin/bfinger on a distroless nonroot base.
@@ -30,7 +30,7 @@
 
 # The builder runs on the build machine's own platform and cross-compiles to
 # the target's, so an arm64 image needs no emulation.
-FROM --platform=$BUILDPLATFORM golang:1.27-alpine@sha256:eb61c3873c97416fff0116553fff65d67a3549f72e11d9758849a689cdd8b523 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine@sha256:70bd7ddea8b6cbe5d6943cde279d6b67feb10cc924fb9100d1d8757c1575b280 AS builder
 RUN apk add --no-cache git ca-certificates
 WORKDIR /src
 
@@ -51,7 +51,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
         -ldflags "-s -w -X main.version=${VERSION}" \
         -o /out/bfinger ./cmd/bfinger
 
-FROM gcr.io/distroless/static:nonroot@sha256:25ac8f0c3b2334a9eb05452266bd4697864a8c8ef0ef71e5e6480d7f92868329
+FROM gcr.io/distroless/static:nonroot@sha256:aafe993665bf6200db38a02c11a9351e782a84b6a45e7f33b6695638c88e3931
 USER nonroot:nonroot
 COPY --from=builder /out/ /usr/local/bin/
 COPY --from=builder --chown=65532:65532 --chmod=0700 /state/.bfinger /home/nonroot/.bfinger
