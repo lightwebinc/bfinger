@@ -6,8 +6,11 @@ through a real wallet.
 
 A separate Go module on purpose: the toolbox brings a dependency tree the
 command must not carry, and the wire is the only thing the two share. The
-`replace` lines in `go.mod` mirror the toolbox's own; without them its
-transitive tree does not build.
+`replace` lines in `go.mod` hold its transitive tree at versions that build
+together: `kube-openapi` at the commit the toolbox's own `go.mod` replaces it
+with, and `quic-go`, `webtransport-go` and `go-libp2p` as one matched set.
+Move them only by hand, with the toolbox, and only to what its `go.mod` says;
+Renovate leaves them alone.
 
 ```console
 $ cd tools/walletd && go build -o walletd .

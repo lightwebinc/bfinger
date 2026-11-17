@@ -116,10 +116,13 @@ func run(dir, listen, network, arcade, chaintracks string) error {
 		}
 	}
 	defer func() {
+		// ctx is already cancelled by the signal that brought us here.
+		stop, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
 		if mon != nil {
-			_ = mon.Stop()
+			_ = mon.Stop(stop)
 		}
-		store.Stop()
+		store.Stop(stop)
 	}()
 
 	w, err := wallet.NewWithStorageFactory(chain, keyHex, func(sdk.Interface) (wdk.WalletStorageProvider, func(), error) {
