@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.28.0@sha256:bb22d9815c728170f72750f4e5b0d672e06176142e1d602c7e66c050100b7e5b
+# syntax=docker/dockerfile:1.29.0@sha256:572cebbc2b15e6f84c077742952674889cb63cd5e9b80abdffcbe587b6f19183
 #
 # finger-host: the reference overlay host (overlay-blueprints) with the finger
 # module (tm_finger, ls_finger) baked in, so a host is one image and needs no
@@ -15,7 +15,7 @@ ARG BLUEPRINTS=ghcr.io/lightwebinc/overlay-blueprints:0.2.2
 # The bundle is JavaScript, the same bytes on every platform, so it is built
 # once on the build machine's own platform; the final stage only copies files
 # onto the host image, so an arm64 image needs no emulation.
-FROM --platform=$BUILDPLATFORM node:24@sha256:8fa96264f302f58bbb13aa7339c541547b56975766ce956c875da149452a3e40 AS bundle
+FROM --platform=$BUILDPLATFORM node:24@sha256:9d266751ca3d7fdbe651c878ffd5ad0a42fed49a18c283509267c97f025b7496 AS bundle
 WORKDIR /src/host
 COPY host/package.json host/package-lock.json ./
 COPY host/vendor ./vendor
