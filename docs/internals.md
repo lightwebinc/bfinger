@@ -67,7 +67,8 @@ cmd/bfinger/        the command, and nothing else
 internal/
   config/           settings; host and facade have no default; header_url, chain and settle default to public services
   goldentest/       the shared vector's reader
-  protocol/         bfinger's formats: record, token, carrier, mint
+  messagebox/       the BRC-33 message box client a delivery is sent and taken through
+  protocol/         bfinger's formats: record, token, carrier, mint, private
   reader/           lookup questions, the reader's algorithm, the pin file
   publisher/        the publisher's state and its wallet profile
 module/             tm_finger and ls_finger in Go, to bcommon's module contract, for a Go overlay host
@@ -96,6 +97,8 @@ bcommon's TypeScript package at the same tag and deploy as one file,
 | `protocol/token` | The state token: its tags, the `[1,"bfinger"]` protocol, the `profile` and `record` key ids, the 1 satoshi value, the `[tag, C]` layout, over `bcommon/pushdrop` |
 | `protocol/carrier` | The record derivation, the funding tag and lock, the record's rules and the classifier, handed to `bcommon/carrier` |
 | `protocol/mint` | The token and the funding tree under bfinger's locks, built by `bcommon/mint`, and the BRC-29 payment |
+| `protocol/private` | What opens a private store: the store key a reader is handed, the sealed segments (over `bcommon/keyed`), the release and delivery envelopes, and the delivery's anchor |
+| `messagebox` | A BRC-33 message box client (send, list, acknowledge), mutually authenticated through go-sdk's AuthFetch; a box that asks for payment is refused, not paid |
 | `reader/lookup` | The finger service name and its two questions (`FingerQuestion`, `CarrierQuestion`), over `bcommon/lookup` and `bcommon/hostset` |
 | `reader/knownkeys` | The pin file's default path and header over `bcommon/knownkeys`, and the grammar sample in `docs/known-keys.md` |
 | `reader/verify` | The reader's algorithm and its `Options`, driving `bcommon/verify`; the refusal vocabulary re-exported; the conformance matrix in its tests |
@@ -110,6 +113,8 @@ The bcommon packages bfinger imports:
 | --- | --- |
 | `bcommon/cbor` | The deterministic CBOR subset (RFC 8949) a record is written in |
 | `bcommon/store` | Store references and manifests, and the rule that rebuilds a store's root (RFC 6962 arithmetic in `bcommon/commit`, which bfinger's tests also use) |
+| `bcommon/commit` | RFC 6962 Merkle roots, for a private store's salted root |
+| `bcommon/keyed` | BRC-369 keyed content: the content key, its symmetric key and commitment, and the segment IV and bounds a private store is sealed under |
 | `bcommon/pushdrop` | The BRC-42/43 derivation (counterparty anyone, forSelf) and the tagged PushDrop locked and decoded under it |
 | `bcommon/carrier` | The unmined carrier, its funding outputs, and the sweep that retracts them |
 | `bcommon/mint` | The mined transactions (transition, funding tree, BRC-29 payment) and their fee loop, at a rate in satoshis per bytes |
@@ -117,6 +122,7 @@ The bcommon packages bfinger imports:
 | `bcommon/funding` | The funding tree a producer keeps between runs, and rebuilding a transaction kept before it mined |
 | `bcommon/producer` | The owner commands' core: fee inputs and change, settlement (waiting, or `proofs = async`), the funding-tree lifecycle, kept unproven transactions, and proof collection that republishes what has mined |
 | `bcommon/publish` | The two legs (`ParseSettler`: arcade, ARC, node RPC, TCP ingress; the facade), which never share a socket, and the journal |
+| `bcommon/unicast` | The object leg when `facade` names several hosts: every object sent to each, published once one took it |
 | `bcommon/nodeapi` | The chain view (`ParseChain`: WhatsOnChain or a node's asset API, every proof checked against the header source) and a node's JSON-RPC under a caller-set request id, each BUMP checked by `bcommon/guard` before the SDK parses it |
 | `bcommon/bwallet` | The embedded BRC-100 wallet (`identity.json`, `wallet.json`), the spendable outputs, `Signer` over any `wallet.Interface`, and the checked import of a funding payment by txid or BEEF |
 | `bcommon/wirewallet` | The BRC-100 wallet wire: `Dial` for `wallet = wire`, `Serve` for `serve-wallet` |
@@ -128,6 +134,7 @@ The bcommon packages bfinger imports:
 | `bcommon/knownkeys` | The pin file's grammar and the pin store's rules |
 | `bcommon/verify` | The refusal vocabulary, the SPV verdict against the reader's headers, and `VerifyCarrier` for store members |
 | `bcommon/guard` | The walk every BEEF, raw transaction and BUMP from the network passes before go-sdk parses it, bounding each declared count by the bytes present; and `ParsePubKey`, which accepts a key from the wire only in its one encoding |
+| `bcommon/module` | The engine-neutral contract `module/` is written to: the topic manager and lookup service a Go overlay host mounts |
 | `bcommon/goldentest` | Vector-free test helpers: a fixed key, parsing that fails the test, a stub chain tracker |
 
 ## Dependencies

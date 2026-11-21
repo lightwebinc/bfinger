@@ -700,7 +700,12 @@ Verified against the pinned versions:
   source scripts and `sum(outputs) <= sum(inputs)`; `verifyTransactionFee`
   returns immediately when `feeModel === undefined`; no `lockTime`, `nSequence`
   or finality check anywhere in the verify helpers (`lockTime` reaches only the
-  script interpreter). The Go SDK's SPV path reads no finality either.
+  script interpreter).
+- go-sdk's `spv.Verify` refuses a transaction that is not final, so the Go
+  reader verifies through bcommon's `verify.Check`: every proof against the
+  reader's header source, then the scripts, amounts and shape of every
+  unmined transaction (`spv.VerifyScripts`; a proven one rests on its
+  block), with no finality rule.
 - `@bsv/overlay` 2.3.1 `Engine.submit` calls
   `tx.verify(this.chainTracker)` with no fee model. Eviction of unproven
   outputs is opt-in: `evictUnprovenTransactions` is reached only from
