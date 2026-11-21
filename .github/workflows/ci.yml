@@ -51,9 +51,9 @@ jobs:
         run: python3 scripts/gen-third-party-licenses.py . --check
 
   # tools/walletd is a separate Go module (the wallet toolbox tree must not
-  # reach bfinger), so the job above never builds it. Renovate PRs moved its
-  # replace targets and a toolbox API under it, and main stopped building
-  # with no check going red.
+  # reach bfinger), so the job above never builds it. This job does, so that
+  # a dependency update that moves a replace target or a toolbox API under
+  # it turns a check red.
   walletd:
     runs-on: ubuntu-latest
     defaults:
