@@ -156,7 +156,7 @@ move it. Every BEEF, raw transaction and BUMP bfinger reads from the network
 also passes `bcommon/guard` first, so that bound no longer rests on the pin
 alone.
 
-The host modules have two runtime dependencies: `@bsv/sdk` at exactly 2.7.1,
+The host modules have two runtime dependencies: `@bsv/sdk` at exactly 4.1.2,
 which the overlay host provides, and `@lightwebinc/bcommon` at the tag go.mod
 pins, vendored as a tarball under `host/vendor/`. A host test fails while the
 tarball, the installed package and go.mod disagree. The bundle's only import
