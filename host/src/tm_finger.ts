@@ -51,7 +51,7 @@ export class FingerTopicManager implements TopicManager {
     // carrier, so that a second spend of it (the kill switch) is one the
     // engine reports. Dropping it would delete a fact because a later
     // object was bad; the engine would also delete the coin's own ancestry
-    // (Engine.js deleteUTXODeep, lines 1613-1653).
+    // (Engine.js deleteUTXODeep, lines 2851-2909, 2.8.0).
     const coinsToRetain = [...previousCoins]
     const refuse = (reason: RefuseReason, txid?: string): AdmittanceInstructions => {
       this.host.metrics.inc('finger_refused_total', { reason })
@@ -117,14 +117,15 @@ export class FingerTopicManager implements TopicManager {
     // outputs the topic holds: the sweep of a funding tree, or any spend of
     // a funding output to somewhere else. It is accepted for its inputs
     // alone. The engine treats a submission with previous coins as accepted
-    // (Engine.js isTopicSubmissionAccepted, lines 463-468: `previousCoins.length > 0`
-    // is one of the accepting conditions), marks each previous output spent
-    // and notifies every lookup service's outputSpent with this txid before
-    // any storage mutation (markPreviousOutputsSpent, lines 582-590, through
-    // markPreviousOutputSpent and notifyOutputSpent, lines 516-581), and a
+    // (Engine.js isTopicSubmissionAccepted, lines 854-860: `previousCoins.length > 0`
+    // is one of the accepting conditions). Its storage phase begins by marking
+    // each previous output spent in storage and then notifying every lookup
+    // service's outputSpent with this txid, before it stores any new output
+    // (markPreviousOutputsSpent, lines 969-977, through markPreviousOutputSpent
+    // and notifyOutputSpent, lines 908-968; then applyStorageMutations), and a
     // retained coin is kept as consumed rather than deleted
-    // (classifyPreviousCoins, lines 591-612). Read in
-    // @bsv/overlay 2.3.1's dist/esm/src/Engine.js.
+    // (classifyPreviousCoins, lines 978-998). Read in
+    // @bsv/overlay 2.8.0's dist/esm/src/Engine.js.
     const nothingFingerShaped = tokenReason === undefined && carrierReason === 'not-pushdrop'
     if (nothingFingerShaped && previousCoins.length > 0) {
       this.host.metrics.inc('finger_admitted_total', { kind: 'spend' })

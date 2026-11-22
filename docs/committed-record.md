@@ -706,7 +706,7 @@ Verified against the pinned versions:
   reader's header source, then the scripts, amounts and shape of every
   unmined transaction (`spv.VerifyScripts`; a proven one rests on its
   block), with no finality rule.
-- `@bsv/overlay` 2.3.1 `Engine.submit` calls
+- `@bsv/overlay` 2.8.0 `Engine.submit` calls
   `tx.verify(this.chainTracker)` with no fee model. Eviction of unproven
   outputs is opt-in: `evictUnprovenTransactions` is reached only from
   `maintainUnprovenTransactions`, which the host never calls;
