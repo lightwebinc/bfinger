@@ -118,10 +118,11 @@ export class FingerTopicManager implements TopicManager {
     // a funding output to somewhere else. It is accepted for its inputs
     // alone. The engine treats a submission with previous coins as accepted
     // (Engine.js isTopicSubmissionAccepted, lines 854-860: `previousCoins.length > 0`
-    // is one of the accepting conditions), marks each previous output spent
-    // and notifies every lookup service's outputSpent with this txid before
-    // any storage mutation (markPreviousOutputsSpent, lines 969-977, through
-    // markPreviousOutputSpent and notifyOutputSpent, lines 908-968), and a
+    // is one of the accepting conditions). Its storage phase begins by marking
+    // each previous output spent in storage and then notifying every lookup
+    // service's outputSpent with this txid, before it stores any new output
+    // (markPreviousOutputsSpent, lines 969-977, through markPreviousOutputSpent
+    // and notifyOutputSpent, lines 908-968; then applyStorageMutations), and a
     // retained coin is kept as consumed rather than deleted
     // (classifyPreviousCoins, lines 978-998). Read in
     // @bsv/overlay 2.8.0's dist/esm/src/Engine.js.
