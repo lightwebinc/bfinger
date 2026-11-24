@@ -37,13 +37,13 @@ vet:
 #    indirect passes it; this one reads the imports, so a dependency cannot
 #    arrive through the library instead. No linked package at all fails, as
 #    an empty answer here is more likely a broken query than a clean library;
-#  - go-sdk resolves to exactly v1.7.5, with no replacement. Minimal version
+#  - go-sdk resolves to exactly v1.7.8, with no replacement. Minimal version
 #    selection takes the higher of two pins, so a library asking for a later
 #    go-sdk would change what bfinger ships without a line changing here.
 DEPS_DIRECT := github.com/bsv-blockchain/go-sdk github.com/lightwebinc/bcommon
 DEPS_LIB := github.com/lightwebinc/bcommon
 DEPS_LIB_DIRECT := github.com/bsv-blockchain/go-sdk
-DEPS_SDK := github.com/bsv-blockchain/go-sdk v1.7.5
+DEPS_SDK := github.com/bsv-blockchain/go-sdk v1.7.8
 
 deps-check:
 	@set -eu; \

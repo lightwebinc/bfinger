@@ -10,7 +10,7 @@ GOWORK=off go run . golden     # the CBOR goldens record/ is checked against
 ```
 
 What it prints, and what each proved (first on go-sdk v1.5.2; the module now
-builds on v1.7.5):
+builds on v1.7.8):
 
 - `main.go`: six `pushdrop.Lock` mints across counterparty × forSelf at the
   chosen protocol and key triple; only `Anyone` + `forSelf=true` is both
