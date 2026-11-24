@@ -10,9 +10,10 @@ import (
 	"github.com/lightwebinc/bfinger/internal/reader/verify"
 )
 
-// aliasKey is 02 || p+1: go-sdk (checked at v1.7.1 and v1.7.5) reads it as
-// the point with x = 1 and keeps x unreduced, so the one point has a second
-// encoding. bcommon/guard refuses it first whatever the SDK does. No private key is known for it; the risk is anything keyed by key
+// aliasKey is 02 || p+1: go-sdk through v1.7.6 (checked at v1.7.1 and
+// v1.7.5) reads it as the point with x = 1 and keeps x unreduced, so the one
+// point has a second encoding; from v1.7.7 the SDK refuses it too.
+// bcommon/guard refuses it first whatever the SDK does. No private key is known for it; the risk is anything keyed by key
 // bytes.
 var aliasKey = func() (k [33]byte) {
 	k[0] = 0x02
