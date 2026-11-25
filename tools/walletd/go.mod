@@ -4,7 +4,7 @@ go 1.27.4
 
 require (
 	github.com/bsv-blockchain/go-sdk v1.7.8
-	github.com/bsv-blockchain/go-wallet-toolbox v0.191.6
+	github.com/bsv-blockchain/go-wallet-toolbox v0.192.1
 )
 
 require (
@@ -36,7 +36,7 @@ require (
 	github.com/bitcoin-sv/bdk/module/gobdk v1.4.0 // indirect
 	github.com/bsv-blockchain/aerospike-client-go/v8 v8.7.1-bsv6 // indirect
 	github.com/bsv-blockchain/go-batcher/v2 v2.1.1 // indirect
-	github.com/bsv-blockchain/go-bsv-middleware v0.16.3 // indirect
+	github.com/bsv-blockchain/go-bsv-middleware v0.16.4 // indirect
 	github.com/bsv-blockchain/go-bt/v2 v2.7.4 // indirect
 	github.com/bsv-blockchain/go-chaincfg v1.7.0 // indirect
 	github.com/bsv-blockchain/go-chaintracks v1.4.8 // indirect
@@ -64,7 +64,7 @@ require (
 	github.com/flynn/noise v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.10.0 // indirect
-	github.com/go-co-op/gocron/v2 v2.23.0 // indirect
+	github.com/go-co-op/gocron/v2 v2.23.1 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v1.0.2 // indirect
@@ -258,7 +258,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20261026165753-2ffab32bce7e // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261026165753-2ffab32bce7e // indirect
 	google.golang.org/grpc v1.86.0-dev // indirect
-	google.golang.org/protobuf v1.36.12 // indirect
+	google.golang.org/protobuf v1.37.0-rc.1 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
